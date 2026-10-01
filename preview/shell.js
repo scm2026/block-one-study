@@ -1374,16 +1374,34 @@ function fwTipHide(){
   fwHiId = null;
 }
 let fwTipAnchor = null;
+/* The tooltip is appended to <body> and fixed-position, so by default it sizes
+   itself off the stylesheet's flat 330/390px max-width regardless of how much
+   of the page is actually visible. That's fine unzoomed, but once the reader
+   has pinched/zoomed in, the VISIBLE window (window.visualViewport) can be far
+   smaller than the full layout viewport window.innerWidth/innerHeight still
+   report — so a stylesheet-sized card can overflow off the edge of what's
+   actually on screen, or simply dominate it. We clamp both the card's size and
+   its position to visualViewport when it's available, falling back to the
+   window dimensions on a browser without it. A floor keeps the card from
+   shrinking below a comfortably readable size even in a tiny visible window. */
 function fwPlace(){
   const t = fwTipEl, el = fwTipAnchor;
   if(!t || !el) return;
+  const vv = window.visualViewport;
+  const vLeft = vv ? vv.offsetLeft : 0, vTop = vv ? vv.offsetTop : 0;
+  const vW = vv ? vv.width : window.innerWidth, vH = vv ? vv.height : window.innerHeight;
+  const pad = 10, MINW = 220, MINH = 140;
+  const maxW = Math.max(MINW, Math.min(390, vW - pad * 2));
+  t.style.maxWidth = Math.round(maxW) + 'px';
+  const maxH = Math.max(MINH, vH - pad * 2);
+  t.style.maxHeight = Math.round(maxH) + 'px';
+  t.style.overflowY = (t.scrollHeight > maxH) ? 'auto' : '';
   const r = el.getBoundingClientRect(), b = t.getBoundingClientRect();
-  const pad = 10;
   let left = r.left + r.width/2 - b.width/2;
-  left = Math.max(pad, Math.min(left, window.innerWidth - b.width - pad));
+  left = Math.max(vLeft + pad, Math.min(left, vLeft + vW - b.width - pad));
   let top = r.top - b.height - 9;
-  if(top < pad) top = r.bottom + 9;                      /* flip under when it won't fit */
-  if(top + b.height > window.innerHeight - pad) top = Math.max(pad, r.top - b.height - 9);
+  if(top < vTop + pad) top = r.bottom + 9;               /* flip under when it won't fit */
+  if(top + b.height > vTop + vH - pad) top = Math.max(vTop + pad, r.top - b.height - 9);
   t.style.left = Math.round(left) + 'px';
   t.style.top  = Math.round(top) + 'px';
 }
@@ -1400,9 +1418,12 @@ function fwTipShow(el, html){
 function fwTipFollow(){
   if(!fwTipEl || fwTipEl.hidden || !fwTipAnchor) return;
   if(!fwTipAnchor.isConnected){ fwTipHide(); return; }
+  const vv = window.visualViewport;
+  const vLeft = vv ? vv.offsetLeft : 0, vTop = vv ? vv.offsetTop : 0;
+  const vW = vv ? vv.width : window.innerWidth, vH = vv ? vv.height : window.innerHeight;
   const r = fwTipAnchor.getBoundingClientRect();
-  if(r.bottom < 0 || r.top > window.innerHeight ||
-     r.right < 0 || r.left > window.innerWidth){ fwTipHide(); return; }
+  if(r.bottom < vTop || r.top > vTop + vH ||
+     r.right < vLeft || r.left > vLeft + vW){ fwTipHide(); return; }
   fwPlace();
 }
 function termFirst(p){ const m = String(p).match(/^.*?[.!?](?=\s|$)/); const t = m ? m[0] : String(p); return t.length > 240 ? t.slice(0,237) + '…' : t; }
@@ -1598,6 +1619,13 @@ function fwFindNode(f, id){
 })();
 window.addEventListener('scroll', fwTipFollow, {passive:true});
 window.addEventListener('resize', fwTipFollow);
+/* a pinch-zoom/pan that doesn't reflow the layout viewport fires neither of the
+   above — only visualViewport sees it — so an open-but-unfocused tooltip needs
+   its own listener here to stay sized and positioned to the visible window. */
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', fwTipFollow);
+  window.visualViewport.addEventListener('scroll', fwTipFollow);
+}
 
 /* ---------------- the left column: collapse and resize ----------------
    Sid reads the right column most of the time, so the left one should get out of the
