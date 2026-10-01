@@ -640,7 +640,11 @@ function buildRailToggle(){
   let manualOverride = null;
   let collapsed = false;
   let lastRawAuto = null;
-  function rawAuto(){ return window.innerWidth < BREAK || autoZoomedIn() || gestureZoomedIn; }
+  /* window.PZ (defined later, by pageZoom) is our own controlled zoom — reliable and
+     exact where it applies, unlike the three signals above which are all indirect
+     guesses. Checked defensively since this runs before pageZoom's script has executed
+     on first load. */
+  function rawAuto(){ return window.innerWidth < BREAK || autoZoomedIn() || gestureZoomedIn || !!(window.PZ && window.PZ.active); }
   function sync(){
     const raw = rawAuto();
     if(lastRawAuto !== null && raw !== lastRawAuto) manualOverride = null; /* real change: auto takes back over */
@@ -1692,30 +1696,47 @@ if(window.visualViewport){
   });
 })();
 
-/* ---------------- whole-page hand pan (click empty space, drag) ----------------
-   Zoomed in on the page, getting from one spot to a distant one otherwise means zooming
-   out, scrolling, zooming back in. Click empty space and drag: the whole page pans, in
-   whichever direction there is anywhere to go — including sideways, which is the case
-   this is mainly for (a wide panel run off the right edge). "Empty space" means: not a
-   control, not the framework tree or a peek window (they already have their own drag),
-   and not an actual rendered character, so clicking/selecting text still works as normal.
-   If the drag starts over a panel with its own scrollbar (a grid that didn't fit, an
-   exhibit table) rather than over the page itself, that panel pans instead of the page —
-   whichever one actually has somewhere to go in that direction.
+/* ---------------- whole-page zoom + pan ----------------
+   Replaces reliance on the browser/OS's own zoom, which on a Windows trackpad pinch is
+   completely invisible to the page — no observable change to innerWidth, devicePixelRatio
+   or visualViewport (see the long comment on buildRailToggle), and critically, no real
+   layout overflow for a scroll-based pan to move into sideways. Trackpad pinch DOES still
+   reach the page as a 'wheel' event with ctrlKey set (the same trick buildRailToggle's
+   gesture detection already relies on), so this captures that gesture directly, blocks the
+   browser's own native zoom from acting on it, and applies our own scale+pan transform to
+   a wrapper placed around the page's whole content (`.wrap`, moved inside a new #pagezoom
+   div at load). That makes zoom level and pan position a real, always-readable state
+   (window.PZ) instead of something every feature has to guess at indirectly.
 
-   "Not a text-bearing element" used to mean the whole tag — P, LI, TD and so on — was
-   off limits, on the theory that those are where prose lives. In practice the content
-   card is nearly wall-to-wall <p>/<li> elements, so that blocked panning almost
-   everywhere inside it: the blank line-height gap between two lines of a paragraph, and
-   the padding around a list, are still physically inside a <p> or <li> box even though
-   no glyph is drawn there — exactly the "works in the background strips, not in the
-   content card" bug reported. The fix checks the actual pixel instead of the tag:
+   At rest (k===1) none of this engages: #pagezoom stays in normal document flow and the
+   page scrolls exactly as it always has — native scrollbar, Ctrl+F, keyboard scrolling,
+   all untouched. The moment a zoom-in tick takes k above 1, #pagezoom switches to
+   position:fixed, inset:0 (so all the pan math is simple viewport-relative numbers, not
+   scroll-position-dependent ones), carrying the reader's current scroll position over as
+   the starting pan so nothing jumps. The moment k returns to exactly 1, that's reversed:
+   pan is translated back into a scroll position, #pagezoom returns to normal flow, and
+   native scrolling resumes as if nothing happened.
+
+   Panning (click-drag empty space, or a plain two-finger scroll once zoomed in) reuses the
+   same glyph-precision "is this pixel actually on a rendered character" test as before —
    caretRangeFromPoint/caretPositionFromPoint finds the nearest character to the pointer,
-   and a one-character range around it gives that character's real on-screen box. Only a
-   press that lands inside that box counts as "on text"; every other pixel inside the
-   same <p> — margin, leading, trailing whitespace — is empty space and pans like
-   anywhere else. */
-(function pagePan(){
+   and a one-character range around it gives that character's real on-screen box, so only a
+   press that lands inside that box counts as "on text" and keeps native selection; every
+   other pixel — including the blank line-height gap inside a paragraph's own box — pans.
+   If the drag starts over a panel with its own scrollbar (a grid that didn't fit, an
+   exhibit table), that panel scrolls instead, same as before.
+
+   This is deliberately not wired up to the burger, the Frameworks bar, or the right dock
+   yet beyond one line for the burger so it doesn't regress — see rawAuto() below. Those are
+   the next step, once this engine itself is confirmed solid. */
+(function pageZoom(){
+  const wrap = document.querySelector('body > .wrap');
+  if(!wrap) return;
+  const pz = document.createElement('div');
+  pz.id = 'pagezoom';
+  wrap.parentNode.insertBefore(pz, wrap);
+  pz.appendChild(wrap);
+
   const SKIP = 'button,a,input,textarea,select,[contenteditable="true"],label,.term,.fwview,.peek,#dock,.rz,.askit';
   function overGlyph(x, y){
     let node = null, offset = 0;
@@ -1738,24 +1759,79 @@ if(window.visualViewport){
     return false;                                           /* nearest character exists but isn't under the pointer */
   }
   const pannable = (el, x, y) => !!(el && !(el.closest && el.closest(SKIP)) && !overGlyph(x, y));
-  const THRESH = 4;
   /* nearest ancestor (stopping at body) that can actually scroll on this axis; null means
-     the page itself (window) is the one with room to move */
+     the page/pagezoom wrapper itself is the one with room to move */
   function scrollAncestor(el, axis){
     let node = el;
     while(node && node !== document.body && node !== document.documentElement){
       const cs = getComputedStyle(node);
       if(axis === 'x'){
-        const ov = cs.overflowX;
-        if((ov === 'auto' || ov === 'scroll') && node.scrollWidth > node.clientWidth + 1) return node;
+        if((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && node.scrollWidth > node.clientWidth + 1) return node;
       } else {
-        const ov = cs.overflowY;
-        if((ov === 'auto' || ov === 'scroll') && node.scrollHeight > node.clientHeight + 1) return node;
+        if((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && node.scrollHeight > node.clientHeight + 1) return node;
       }
       node = node.parentElement;
     }
     return null;
   }
+
+  const K_MIN = 1, K_MAX = 4;
+  let k = 1, tx = 0, ty = 0, active = false;
+
+  function apply(){ pz.style.transform = active ? `scale(${k}) translate(${tx}px, ${ty}px)` : ''; }
+  function clampPan(){
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const cw = wrap.scrollWidth, ch = wrap.scrollHeight;
+    tx = (cw * k <= vw) ? (vw / k - cw) / 2 : Math.min(0, Math.max(vw / k - cw, tx));
+    ty = (ch * k <= vh) ? (vh / k - ch) / 2 : Math.min(0, Math.max(vh / k - ch, ty));
+  }
+  function engage(){
+    active = true;
+    tx = -window.scrollX; ty = -window.scrollY;
+    pz.style.position = 'fixed'; pz.style.inset = '0'; pz.style.overflow = 'hidden';
+    document.documentElement.classList.add('pz-active');
+  }
+  function disengage(){
+    active = false;
+    const gx = Math.max(0, -tx), gy = Math.max(0, -ty);
+    pz.style.position = ''; pz.style.inset = ''; pz.style.overflow = '';
+    k = 1; tx = 0; ty = 0;
+    document.documentElement.classList.remove('pz-active');
+    apply();
+    window.scrollTo(gx, gy);
+  }
+  function zoomAt(nextK, cx, cy){
+    nextK = Math.min(K_MAX, Math.max(K_MIN, nextK));
+    if(nextK === k) return;
+    if(!active && nextK > K_MIN) engage();
+    const localX = cx / k - tx, localY = cy / k - ty;
+    k = nextK;
+    tx = cx / k - localX; ty = cy / k - localY;
+    clampPan();
+    apply();
+    if(active && k <= K_MIN) disengage();
+  }
+
+  /* trackpad pinch / Ctrl+scroll: our zoom, not the browser's */
+  window.addEventListener('wheel', e=>{
+    if(!e.ctrlKey) return;
+    if(e.target && e.target.closest && e.target.closest('.fwview')) return; /* the framework canvas owns its own pinch */
+    e.preventDefault();
+    zoomAt(k * (e.deltaY < 0 ? 1.08 : 1 / 1.08), e.clientX, e.clientY);
+  }, {passive:false});
+
+  /* an ordinary two-finger scroll, once zoomed in, pans — #pagezoom is fixed/non-scrolling
+     in that state, so without this the only way to move would be click-drag */
+  window.addEventListener('wheel', e=>{
+    if(!active || e.ctrlKey) return;
+    if(e.target && e.target.closest && e.target.closest(SKIP)) return;
+    if(scrollAncestor(e.target, 'x') || scrollAncestor(e.target, 'y')) return; /* an inner panel's own scrollbar handles it */
+    e.preventDefault();
+    tx -= e.deltaX / k; ty -= e.deltaY / k;
+    clampPan(); apply();
+  }, {passive:false});
+
+  /* click-drag empty space to pan */
   let pend = null;
   document.addEventListener('pointerdown', e=>{
     if(e.button !== 0 || !pannable(e.target, e.clientX, e.clientY)) return;
@@ -1763,23 +1839,30 @@ if(window.visualViewport){
     pend = {
       x:e.clientX, y:e.clientY, started:false, xEl, yEl,
       sl: xEl ? xEl.scrollLeft : window.scrollX,
-      st: yEl ? yEl.scrollTop  : window.scrollY
+      st: yEl ? yEl.scrollTop  : window.scrollY,
+      tx0: tx, ty0: ty
     };
   });
   document.addEventListener('pointermove', e=>{
     if(!pend) return;
     const dx = e.clientX - pend.x, dy = e.clientY - pend.y;
     if(!pend.started){
-      if(Math.hypot(dx, dy) < THRESH) return;
+      if(Math.hypot(dx, dy) < 4) return;
       pend.started = true;
       document.documentElement.classList.add('panning');
     }
     e.preventDefault();
-    const wx = pend.xEl ? window.scrollX : pend.sl - dx;
-    const wy = pend.yEl ? window.scrollY : pend.st - dy;
-    if(wx !== window.scrollX || wy !== window.scrollY) window.scrollTo(wx, wy);
     if(pend.xEl) pend.xEl.scrollLeft = pend.sl - dx;
     if(pend.yEl) pend.yEl.scrollTop  = pend.st - dy;
+    if(active){
+      if(!pend.xEl) tx = pend.tx0 + dx / k;
+      if(!pend.yEl) ty = pend.ty0 + dy / k;
+      clampPan(); apply();
+    } else {
+      const wx = pend.xEl ? window.scrollX : pend.sl - dx;
+      const wy = pend.yEl ? window.scrollY : pend.st - dy;
+      if(wx !== window.scrollX || wy !== window.scrollY) window.scrollTo(wx, wy);
+    }
   });
   const end = ()=>{
     if(pend && pend.started) document.documentElement.classList.remove('panning');
@@ -1787,6 +1870,12 @@ if(window.visualViewport){
   };
   window.addEventListener('pointerup', end);
   window.addEventListener('blur', end);
+
+  /* a real, always-readable zoom state for other features to key off — starting with
+     buildRailToggle's rawAuto() below, so the burger doesn't regress now that the old
+     signals it relied on (innerWidth, devicePixelRatio, the raw gesture tally) are
+     superseded by this for anyone using this zoom path */
+  window.PZ = { get k(){ return k; }, get active(){ return active; } };
 })();
 
 render();

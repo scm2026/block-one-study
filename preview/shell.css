@@ -569,8 +569,10 @@ button.chip[aria-pressed="true"]{box-shadow:0 0 0 2px var(--ground), 0 0 0 3px v
 .fwtip.pinned .hint{display:none}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 
-/* whole-page hand pan: hold Space, drag anywhere to scroll the document */
+/* whole-page zoom + pan (core/shell.js, pageZoom) */
 html.panning, html.panning *{cursor:grabbing !important; user-select:none}
+#pagezoom{transform-origin:0 0}
+html.pz-active, html.pz-active body{overflow:hidden}
 
 /* kept from block one, dropped by the copies */
 .spark{min-width:0}
