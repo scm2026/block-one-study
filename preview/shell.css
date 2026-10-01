@@ -1,0 +1,673 @@
+
+:root{
+  --ink:#1b1a21; --ink-2:#4a4855; --ink-3:#77748a;
+  --ground:#f6f4f0; --panel:#fffefc; --line:#e2ded6; --line-2:#cfc9be;
+  --booth:#8c1230; --kellogg:#4e2a84;
+  --accent:#0f6b63; --accent-soft:#d9ebe8; --accent-line:#8cc3bb;
+  --warn:#9a5b00; --warn-soft:#f6e6c8;
+  --ours:#5b3ea8; --ours-soft:#e9e3f7;
+  --dim:#b9b4ab; --on-accent:#ffffff;
+  --shadow:0 1px 2px rgba(27,26,33,.06), 0 8px 24px -16px rgba(27,26,33,.3);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  color-scheme: dark;
+  --ink:#f0eef4; --ink-2:#bab6c6; --ink-3:#8b8799;
+  --ground:#16151a; --panel:#1e1d24; --line:#2e2c37; --line-2:#3d3a48;
+  --booth:#e07189; --kellogg:#b79ae8;
+  --accent:#63cfc2; --accent-soft:#12312e; --accent-line:#2e6f68;
+  --warn:#e0a955; --warn-soft:#3a2d16;
+  --ours:#b79ae8; --ours-soft:#2a2140;
+  --dim:#4d4a5c; --on-accent:#0d1a19;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
+}}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --ink:#f0eef4; --ink-2:#bab6c6; --ink-3:#8b8799;
+  --ground:#16151a; --panel:#1e1d24; --line:#2e2c37; --line-2:#3d3a48;
+  --booth:#e07189; --kellogg:#b79ae8;
+  --accent:#63cfc2; --accent-soft:#12312e; --accent-line:#2e6f68;
+  --warn:#e0a955; --warn-soft:#3a2d16;
+  --ours:#b79ae8; --ours-soft:#2a2140;
+  --dim:#4d4a5c; --on-accent:#0d1a19;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
+}
+*{box-sizing:border-box}
+body{margin:0; background:var(--ground); color:var(--ink);
+  font-family:"Public Sans",ui-sans-serif,system-ui,sans-serif; font-size:15px; line-height:1.55}
+.wrap{max-width:1260px; margin:0 auto; padding-inline:16px; padding-block:26px 72px}
+h1,h2,h3{font-family:"Spectral",Georgia,serif; font-weight:600; margin:0; text-wrap:balance}
+h1{font-size:clamp(26px,4vw,40px); line-height:1.1; letter-spacing:-.015em}
+.eyebrow{font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3)}
+.lede{color:var(--ink-2); max-width:70ch; margin-top:10px}
+header.page{border-bottom:1px solid var(--line); padding-bottom:20px}
+.card{background:var(--panel); border:1px solid var(--line); border-radius:3px}
+.ramp{margin-top:20px; padding:16px 16px 10px}
+.ramp h3{font-size:12px; font-family:"Public Sans",sans-serif; font-weight:700; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:12px}
+.sparks{display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px}
+.spark .nm{font-size:12px; font-weight:600; color:var(--ink-2); margin-bottom:2px}
+.spark .sub{font-size:11px; color:var(--ink-3); margin-bottom:5px; min-height:15px}
+.spark svg{display:block; width:100%; height:auto}
+.toolkit{display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:12px 16px; margin-top:12px}
+.toolkit .lab{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-3)}
+.chip{font-size:12px; padding:3px 9px; border-radius:2px; border:1px solid var(--line-2); color:var(--ink-3)}
+.chip.have{background:var(--accent-soft); border-color:var(--accent-line); color:var(--ink)}
+.chip.new{background:var(--accent); border-color:var(--accent); color:var(--on-accent); font-weight:600}
+.rail{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1px; background:var(--line);
+  border:1px solid var(--line); border-radius:3px; margin-top:22px; overflow:hidden}
+.rail button{background:var(--panel); border:0; text-align:left; font:inherit; color:inherit;
+  padding:12px 14px; cursor:pointer; display:flex; flex-direction:column; gap:5px}
+.rail button:hover{background:var(--accent-soft)}
+.rail button[aria-current="true"]{background:var(--accent-soft); box-shadow:inset 0 -3px 0 var(--accent)}
+.rail button:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
+.rail .n{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.08em}
+.rail .n.b{color:var(--booth)} .rail .n.k{color:var(--kellogg)}
+.rail .nm{font-weight:700; font-size:14.5px; line-height:1.2}
+.rail .mv{font-size:11.5px; color:var(--ink-3)}
+.flag{font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.06em; font-weight:600;
+  color:var(--warn); background:var(--warn-soft); padding:2px 5px; border-radius:2px}
+.flag.ex{color:var(--accent); background:var(--accent-soft)}
+.bridge{border-left:3px solid var(--warn); background:var(--warn-soft); padding:12px 16px; border-radius:2px;
+  margin-top:18px}
+.bridge .tag{font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.1em; font-weight:600;
+  text-transform:uppercase; color:var(--warn); display:block; margin-bottom:4px}
+.bridge p{margin:0; color:var(--ink-2); font-size:13.5px; max-width:80ch}
+.split{display:grid; grid-template-columns:var(--lw,minmax(0,0.74fr)) 12px minmax(0,1fr);
+  gap:6px; align-items:start; margin-top:18px; position:relative}
+.split.nocanvas{grid-template-columns:0 12px minmax(0,1fr)}
+/* The canvas card is only as tall as its chart; the text column beside it is usually
+   taller, so align-items:start leaves plain page background below the card — it reads
+   as broken rather than intentional once the columns are narrow (heavy zoom squeezes
+   the chart card short while the text wraps to more lines). A hairline spanning the
+   full row turns that gap into a deliberate margin. It's inserted by JS (buildSplitLine
+   in shell.js) as a plain absolutely-positioned element, NOT a grid item/pseudo-element —
+   an earlier ::after version placed via grid-column/grid-row quietly changed the implicit
+   grid sizing on several blocks (broke the Next-button scroll target on four of seven),
+   even with pointer-events:none and zero width. position:absolute removes it from grid
+   placement entirely, so it can't touch track sizing. */
+.splitline{position:absolute; top:0; bottom:0; width:1px; background:var(--line);
+  pointer-events:none; z-index:1}
+@media(max-width:960px){.splitline{display:none}}
+/* NOT display:none. A hidden grid item leaves the grid entirely, so .bodycol shifted up
+   into the 12px splitter track and the body collapsed to 36px — the column Sid actually
+   reads, squeezed by the button meant to give it room. Keep the item in place, at zero
+   width, so the track assignment holds. */
+.split.nocanvas .canvaswrap{visibility:hidden; overflow:hidden; max-width:0}
+/* the grab bar between the columns */
+.splitter{position:sticky; top:calc(env(safe-area-inset-top,0px) + 12px); height:120px;
+  display:flex; align-items:center; justify-content:center; cursor:col-resize;
+  border-radius:3px; touch-action:none; user-select:none}
+.splitter::before{content:""; width:3px; height:54px; border-radius:2px;
+  background:var(--line-2); transition:background .13s}
+.splitter:hover::before, .splitter.drag::before{background:var(--accent)}
+.splitter button{position:absolute; top:-2px; left:50%; transform:translateX(-50%);
+  width:20px; height:20px; padding:0; border-radius:50%; cursor:pointer;
+  border:1px solid var(--line-2); background:var(--panel); color:var(--ink-3);
+  font-family:"IBM Plex Mono",monospace; font-size:11px; line-height:1; display:flex;
+  align-items:center; justify-content:center}
+.splitter button:hover{border-color:var(--accent); color:var(--ink)}
+.splitter button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+@media(max-width:960px){
+  .split{grid-template-columns:1fr !important}
+  .splitter{display:none}
+  .split.nocanvas .canvaswrap{visibility:visible; overflow:visible; max-width:none}
+}
+@media(max-width:960px){.split{grid-template-columns:1fr}}
+.canvaswrap{position:sticky; top:calc(env(safe-area-inset-top,0px) + 12px)}
+@media(max-width:960px){.canvaswrap{position:static}}
+.canvas{padding:12px 12px 4px}
+.canvas svg, .figure svg{display:block; width:100%; height:auto}
+.figure{padding:2px 12px 10px}
+.figcap{font-size:12px; color:var(--ink-3); padding:0 12px 12px; margin:0}
+/* original exhibit + annotation */
+.exwrap{padding:12px}
+.exhead{display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:8px}
+.exhead .t{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.09em;
+  font-weight:600; text-transform:uppercase; color:var(--booth)}
+.exhead .t.k{color:var(--kellogg)}
+.exhead .s{font-size:11px; color:var(--ink-3)}
+.exbox{position:relative; border:1px solid var(--line-2); border-radius:2px; overflow:hidden;
+  background:#ffffff}
+.exbox img{display:block; width:100%; height:auto}
+.mark{position:absolute; width:21px; height:21px; border-radius:50%;
+  background:rgba(154,91,0,.13); color:#8a5200; border:1.5px solid rgba(154,91,0,.62);
+  font-family:"IBM Plex Mono",monospace; font-size:11px; font-weight:700; display:flex;
+  align-items:center; justify-content:center; transform:translate(-50%,-50%);
+  box-shadow:0 0 0 1.5px rgba(255,255,255,.6); cursor:default;
+  transition:background .13s ease, color .13s ease, box-shadow .13s ease}
+.mark:hover{background:#8a5200; color:#fff; border-color:#8a5200;
+  box-shadow:0 0 0 3px rgba(255,255,255,.92)}
+.exbox:hover .mark{background:rgba(154,91,0,.07); border-color:rgba(154,91,0,.4)}
+.exbox:hover .mark:hover{background:#8a5200; border-color:#8a5200}
+.annots{margin-top:10px; display:flex; flex-direction:column; gap:7px}
+.annot{display:flex; gap:9px; align-items:flex-start; font-size:12.5px; color:var(--ink-2)}
+.annot b{flex:0 0 21px; height:21px; border-radius:50%; background:var(--warn-soft);
+  color:var(--warn); border:1.5px solid var(--warn); font-weight:700;
+  font-family:"IBM Plex Mono",monospace; font-size:11px; display:flex; align-items:center;
+  justify-content:center}
+/* plain-English hover on ordinary prose. A dotted rule, not a colour or a weight: the
+   page already uses colour to mean source/ours/bent, and a term that shouts would pull
+   the eye away from the sentence it sits in. */
+.term{border-bottom:1px dotted color-mix(in srgb, var(--ink-3) 55%, transparent);
+  cursor:help; transition:border-bottom-color .12s, color .12s}
+.term:hover{border-bottom-color:var(--accent); color:var(--ink)}
+.steps{display:flex; gap:4px; flex-wrap:wrap; margin-bottom:12px}
+/* The step number is its own span so the rail can dim it. It carries its own spacing
+   rather than relying on the rail's flex gap, which does not exist in the narrow bar —
+   that is how the buttons came out reading "1Prompt". */
+.steps button .sn{font-family:"IBM Plex Mono",monospace; font-size:10.5px;
+  color:var(--ink-3); flex:0 0 auto; margin-right:4px}
+.steps button[aria-current="true"] .sn{color:inherit; opacity:.75}
+/* Narrow: the bar Sid already has, pinned so it does not scroll away. */
+@media(max-width:1099px){
+  .steps{position:sticky; top:calc(env(safe-area-inset-top,0px)); z-index:32;
+    background:var(--ground); padding:8px 0 8px; margin-bottom:10px;
+    box-shadow:0 8px 8px -8px rgba(0,0,0,.18)}
+}
+/* Wide: a rail down the side of the body, always in view, reading as a contents list
+   for the case rather than as a row of buttons. */
+@media(min-width:1100px){
+  .bodycol{display:grid; grid-template-columns:150px minmax(0,1fr); gap:16px;
+    align-items:start}
+  /* When the rail auto-collapses (html.railAuto, below), #steps goes display:none —
+     dropped out of the grid entirely. That leaves the body card as the only item in a
+     template still asking for two columns: with no explicit placement it falls into the
+     first (150px) track by Grid's normal auto-placement rule, and the 1fr track beside
+     it sits empty — a narrow card with a wide blank gutter next to it. This is the "narrow
+     card + blank space" Sid flagged: it needs real zoom (or just clicking the hamburger
+     at a wide-enough window) to show up, because below 1100px .bodycol isn't a grid at
+     all and the card already has the full row to itself. Make the card span both tracks
+     whenever the rail isn't there to claim the first one. */
+  html.railAuto .bodycol > .card{grid-column:1 / -1}
+  .steps{flex-direction:column; flex-wrap:nowrap; gap:2px; margin-bottom:0;
+    position:sticky; top:calc(env(safe-area-inset-top,0px) + 12px); align-self:start;
+    max-height:calc(100vh - 40px); overflow-y:auto; padding-right:2px}
+  .steps button{width:100%; text-align:left; padding:7px 10px; border-color:transparent;
+    background:transparent; display:flex; align-items:baseline; line-height:1.25}
+  .steps button:hover{background:var(--panel); border-color:var(--line)}
+  .steps button[aria-current="true"]{background:var(--accent-soft); color:var(--ink);
+    border-color:var(--accent-line); box-shadow:inset 3px 0 0 var(--accent)}
+  .steps button .sn{font-size:10px}
+  .steps button[aria-current="true"] .sn{color:var(--accent)}
+}
+/* Past the width threshold (buildRailToggle's BREAK, in JS — browser zoom shrinks this
+   exactly like a narrower window does) the step list — whichever form it's in, the wide
+   vertical rail or the narrow horizontal bar — disappears entirely and only the hamburger
+   shows; :not(.floatRail) so the one exception, the flyout panel opened from that
+   hamburger, still renders. Below the threshold it's the reverse: normal list, no hamburger. */
+html.railAuto #steps:not(.floatRail){display:none}
+/* always present — not gated behind auto-detection, since some zoom methods (trackpad
+   pinch / OS-level magnification) never reach the page at all, so this button is the
+   only reliable way to collapse the rail in those cases; auto-collapse still applies
+   it automatically too, this is just no longer the only path. */
+.railToggle{
+  display:flex; position:fixed; top:calc(env(safe-area-inset-top,0px) + 14px); left:10px;
+  z-index:70; width:30px; height:30px; padding:0; align-items:center; justify-content:center;
+  border:1px solid var(--line-2); border-radius:5px; cursor:pointer;
+  background:color-mix(in srgb, var(--panel) 45%, transparent); backdrop-filter:blur(2px);
+  transition:background .12s, border-color .12s, opacity .12s;
+  opacity:.55}
+.railToggle:hover{background:color-mix(in srgb, var(--panel) 80%, transparent); border-color:var(--accent-line); opacity:1}
+html.railAuto .railToggle{opacity:1}
+.railToggle span{position:relative; display:block; width:14px; height:1.6px; background:var(--ink-2); border-radius:1px}
+.railToggle span::before, .railToggle span::after{
+  content:""; position:absolute; left:0; width:14px; height:1.6px; background:var(--ink-2); border-radius:1px}
+.railToggle span::before{top:-5px}
+.railToggle span::after{top:5px}
+/* the step rail as a floating panel, opened from the hamburger — sized in JS (buildRailToggle)
+   to whatever actually fits the window right now, so it holds together at any zoom level;
+   .steps.floatRail has higher specificity than the plain .steps rules above so it wins outright */
+.steps.floatRail{display:flex !important; position:fixed !important; z-index:65; top:0; left:0;
+  flex-direction:column; flex-wrap:nowrap; gap:2px; background:var(--panel); border:1px solid var(--line-2);
+  border-radius:6px; padding:8px; box-shadow:0 12px 28px -12px rgba(0,0,0,.4); overflow:auto}
+.steps button{font:inherit; font-size:12px; font-weight:600; padding:5px 10px; border-radius:2px; cursor:pointer;
+  border:1px solid var(--line-2); background:var(--panel); color:var(--ink-3)}
+.steps button[aria-current="true"]{background:var(--accent); border-color:var(--accent); color:var(--on-accent)}
+.steps button:hover{color:var(--ink)}
+.steps button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.stepbody{padding:18px}
+.stepbody h2{font-size:21px; line-height:1.2}
+.src,.ours,.att{border-left:3px solid; padding:11px 14px; border-radius:2px; margin-top:14px}
+.src{border-color:var(--booth); background:color-mix(in srgb, var(--booth) 5%, transparent)}
+.src.k{border-color:var(--kellogg); background:color-mix(in srgb, var(--kellogg) 6%, transparent)}
+.ours{border-color:var(--ours); background:var(--ours-soft)}
+.att{border-color:var(--accent); background:var(--accent-soft)}
+.tag{font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.1em; font-weight:600;
+  text-transform:uppercase; display:block; margin-bottom:5px}
+.tag.s{color:var(--booth)} .tag.s.k{color:var(--kellogg)} .tag.o{color:var(--ours)} .tag.a{color:var(--accent)}
+.src p,.ours p,.att p{margin:0 0 6px} .src p:last-child,.ours p:last-child,.att p:last-child{margin-bottom:0}
+details.reveal{margin-top:10px}
+details.reveal summary{cursor:pointer; font-size:13px; font-weight:600; color:var(--accent); list-style:none;
+  display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border:1px solid var(--accent-line);
+  border-radius:2px; background:var(--panel)}
+details.reveal summary::-webkit-details-marker{display:none}
+details.reveal summary::before{content:"\25B8"; font-size:11px}
+details.reveal[open] summary::before{content:"\25BE"}
+details.reveal > div{margin-top:10px}
+.railgrid{margin-top:16px; border-top:1px solid var(--line); padding-top:12px;
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px}
+.railgrid .lab{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.09em;
+  font-weight:600; text-transform:uppercase; color:var(--ink-2); display:block; margin-bottom:4px}
+.railgrid .val{font-size:12.5px; color:var(--ink-2); line-height:1.4}
+.clock{display:flex; height:6px; border-radius:3px; overflow:hidden; border:1px solid var(--line); margin-top:6px}
+.clock i{display:block; background:var(--line-2)}
+.clock i.on{background:var(--accent)}
+.nav{display:flex; justify-content:space-between; gap:10px; margin-top:16px; padding-top:14px;
+  border-top:1px solid var(--line)}
+.nav button{font:inherit; font-size:13px; font-weight:600; padding:8px 14px; border-radius:2px; cursor:pointer;
+  border:1px solid var(--line-2); background:var(--panel); color:var(--ink)}
+.nav button[disabled]{opacity:.4; cursor:default}
+.tiers{display:flex; align-items:center; column-gap:18px; row-gap:4px; flex-wrap:wrap; font-size:12px;
+  color:var(--ink-3); margin-top:10px}
+.tiers > span{white-space:nowrap}
+.tick{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:5px; vertical-align:-1px}
+.tick.src{background:var(--booth)} .tick.res{background:var(--accent)} .tick.our{background:var(--ours)}
+footer{margin-top:40px; padding-top:14px; border-top:1px solid var(--line); font-size:12px; color:var(--ink-3); max-width:80ch}
+/* structured answer components (v2 panel) */
+.sub{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.1em;
+  font-weight:600; text-transform:uppercase;
+  color:var(--ink-2); display:flex; align-items:center; gap:8px; margin:18px 0 8px}
+.sub::after{content:""; flex:1; height:1px; background:var(--line)}
+.sub:first-child{margin-top:0}
+/* minmax(0,1fr), not bare 1fr: a grid track's floor is its content's width unless told
+   otherwise, so a long value forced the whole row (and the page under it) to overflow
+   sideways instead of wrapping — this is what zooming in was cutting off */
+.kv{display:grid; grid-template-columns:minmax(72px,34%) minmax(0,1fr); gap:6px 14px; align-items:baseline}
+.kv .k{font-size:12.5px; color:var(--ink-3); line-height:1.35}
+.kv .v{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--ink); line-height:1.35;
+  font-variant-numeric:tabular-nums; overflow-wrap:break-word}
+.kv .row{display:contents}
+.askrow{display:grid; grid-template-columns:auto minmax(0,1fr); gap:8px 10px; margin-bottom:9px; align-items:start}
+.askrow .kind{font-family:"IBM Plex Mono",monospace; font-size:9px; letter-spacing:.08em; font-weight:600;
+  text-transform:uppercase; padding:2px 6px; border-radius:2px; white-space:nowrap; margin-top:1px}
+.kind.clarify{background:var(--warn-soft); color:var(--warn)}
+.kind.unlock{background:var(--accent-soft); color:var(--accent)}
+.kind.test{background:var(--ours-soft); color:var(--ours)}
+.askrow .q{font-size:13px; color:var(--ink); font-weight:600}
+.askrow .why{font-size:12px; color:var(--ink-3); grid-column:2; margin-top:2px}
+/* the payoff of an "unlock" ask -- visually gated behind the question, the same way
+   the source itself gates it, so it never reads as something handed over for free */
+.askrow .reveals{grid-column:2; margin-top:7px; padding:8px 10px; background:var(--accent-soft);
+  border-left:2px solid var(--accent); border-radius:0 2px 2px 0}
+.askrow .reveals .rlab{display:block; font-family:"IBM Plex Mono",monospace; font-size:9.5px;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--accent); margin-bottom:5px}
+.askrow .reveals .kv{gap:4px 12px}
+.miss{display:flex; flex-direction:column; gap:5px}
+.miss div{font-size:12.5px; color:var(--ink-2); border-left:2px dashed var(--line-2); padding-left:9px}
+.calc{display:flex; flex-direction:column; gap:0; border-left:2px solid var(--accent-line); padding-left:12px}
+.calcrow{display:grid; grid-template-columns:1fr auto; gap:2px 12px; padding:6px 0;
+  border-bottom:1px dotted var(--line)}
+.calcrow:last-child{border-bottom:0}
+.calcrow .e{font-family:"IBM Plex Mono",monospace; font-size:12.5px; color:var(--ink-2)}
+.calcrow .r{font-family:"IBM Plex Mono",monospace; font-size:13px; font-weight:600; color:var(--ink);
+  text-align:right; font-variant-numeric:tabular-nums}
+.calcrow .w{grid-column:1 / -1; font-size:11.5px; color:var(--ink-3)}
+.logic{display:flex; flex-direction:column; gap:8px}
+.logic div{display:grid; grid-template-columns:auto minmax(0,1fr); gap:8px; align-items:start}
+.logic .c{font-size:12.5px; color:var(--ink); font-weight:600}
+.logic .b{grid-column:2; font-size:12px; color:var(--ink-3)}
+.logic .dot{width:6px; height:6px; border-radius:50%; background:var(--accent); margin-top:6px}
+.verdict{margin-top:12px; padding:9px 12px; background:var(--accent-soft); border-left:3px solid var(--accent);
+  border-radius:2px; font-size:13px; color:var(--ink); font-weight:600}
+.cols2{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:18px}
+@media(max-width:620px){.cols2{grid-template-columns:1fr}}
+.srcrow, .oursrow{padding:8px 0; border-bottom:1px dotted var(--line)}
+.srcrow:last-child, .oursrow:last-child{border-bottom:0; padding-bottom:0}
+.srcrow .l, .oursrow .l{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.09em;
+  font-weight:600; text-transform:uppercase; color:var(--ink-2); display:block; margin-bottom:4px}
+.srcrow p, .oursrow p{margin:0; font-size:13px; line-height:1.45}
+.newflag{font-family:"IBM Plex Mono",monospace; font-size:9px; letter-spacing:.08em; font-weight:600;
+  color:var(--accent); background:var(--accent-soft); padding:2px 6px; border-radius:2px; margin-left:8px}
+
+
+/* page-tint control */
+.tint{display:flex; align-items:center; gap:7px; margin-top:12px; flex-wrap:wrap}
+.tint .lab{font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.11em;
+  text-transform:uppercase; color:var(--ink-3)}
+.tint button{width:22px; height:22px; border-radius:50%; cursor:pointer; padding:0;
+  border:1px solid var(--line-2); position:relative}
+.tint button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--accent); border-color:var(--accent)}
+.tint button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.tint .nm{font-size:11px; color:var(--ink-3); margin-left:2px; min-width:52px}
+
+/* frameworks + running facts */
+.tools{margin-top:14px; padding:14px}
+.toolhead{display:flex; align-items:center; gap:8px; margin-bottom:9px}
+.toolhead h3{font-family:"Public Sans",sans-serif; font-size:11.5px; font-weight:700; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--ink-2)}
+.toolhead .hint{font-size:11px; color:var(--ink-3); margin-left:auto}
+.fwbar{display:flex; gap:6px; flex-wrap:wrap}
+.fwbtn{font:inherit; font-size:12px; font-weight:600; padding:5px 10px; border-radius:2px; cursor:pointer;
+  border:1px solid var(--line-2); background:var(--panel); color:var(--ink-2); display:inline-flex;
+  align-items:center; gap:6px}
+.fwbtn:hover{color:var(--ink); border-color:var(--accent-line)}
+.fwbtn[aria-pressed="true"]{background:var(--accent-soft); border-color:var(--accent); color:var(--ink)}
+.fwbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.fwdot{width:7px; height:7px; border-radius:50%; background:var(--accent)}
+.fwdot.partial{background:var(--warn)}
+.fwpanel{margin-top:12px; border-top:1px solid var(--line); padding-top:12px}
+.fwwhen{font-size:12px; color:var(--ink-3); margin:0 0 10px}
+.fwcols{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px}
+@media(max-width:700px){.fwcols{grid-template-columns:1fr}}
+.fwcol h4{font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.1em;
+  text-transform:uppercase; font-weight:600; margin:0 0 7px}
+.fwcol.base h4{color:var(--ink-3)} .fwcol.bend h4{color:var(--ours)}
+.fwbranch{margin-bottom:7px}
+.fwbranch b{display:block; font-size:12.5px; color:var(--ink); font-weight:600}
+.fwbranch span{font-size:11.5px; color:var(--ink-3)}
+.fwcol.bend .fwbranch b{color:var(--ours)}
+.fwnote{font-size:12px; color:var(--ink-2); margin:10px 0 0; padding:8px 10px; background:var(--ours-soft);
+  border-left:3px solid var(--ours); border-radius:2px}
+.facts{display:flex; flex-direction:column; gap:9px; max-height:none}
+.factgrp .gl{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.09em;
+  font-weight:600; text-transform:uppercase; color:var(--ink-2); display:flex; align-items:center;
+  gap:7px; margin-bottom:5px}
+.factgrp .gl::after{content:""; flex:1; height:1px; background:var(--line)}
+.factrow{display:grid; grid-template-columns:minmax(72px,42%) minmax(0,1fr); gap:3px 10px; padding:1px 0}
+.factrow .k{font-size:11.5px; color:var(--ink-3)}
+.factrow .v{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink)}
+.factempty{font-size:12px; color:var(--ink-3); font-style:italic}
+
+.promptchip{margin:2px 0 10px}
+.promptchip summary{cursor:pointer; font-size:11.5px; font-weight:600; color:var(--accent);
+  list-style:none; display:inline-flex; align-items:center; gap:6px; padding:4px 9px;
+  border:1px solid var(--accent-line); border-radius:2px; background:var(--panel)}
+.promptchip summary::-webkit-details-marker{display:none}
+.promptchip summary::before{content:"\25B8"; font-size:10px}
+.promptchip[open] summary::before{content:"\25BE"}
+.promptchip p{margin:8px 0 0; font-size:12.5px; line-height:1.45; color:var(--ink-2)}
+
+/* concept glossary on the toolkit chips */
+button.chip{font-family:inherit; font-size:12px; line-height:1.45; background:none;
+  cursor:pointer; -webkit-appearance:none; appearance:none; text-align:left;
+  transition:border-color .15s, color .15s, box-shadow .15s}
+button.chip:hover{border-color:var(--accent-line); color:var(--ink)}
+button.chip:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+button.chip[aria-pressed="true"]{box-shadow:0 0 0 2px var(--ground), 0 0 0 3px var(--accent);
+  border-color:var(--accent)}
+.toolkit .lab .cue{font-size:9px; letter-spacing:.06em; color:var(--ink-3); opacity:.72;
+  text-transform:none; font-style:italic; margin-left:6px}
+.cpanel{flex:0 0 100%; width:100%; margin-top:12px; border-top:1px solid var(--line); padding-top:12px;
+  display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:18px}
+@media(max-width:760px){.cpanel{grid-template-columns:1fr}}
+.cpanel h4{font-family:"Spectral",Georgia,serif; font-size:17px; font-weight:600; margin:0 0 6px}
+.cpanel p{margin:0 0 8px; font-size:13px; line-height:1.5; color:var(--ink-2)}
+.cpanel .lab{font-family:"IBM Plex Mono",monospace; font-size:9px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-3); display:block; margin-bottom:4px}
+.cformula{font-family:"IBM Plex Mono",monospace; font-size:12.5px; color:var(--ink);
+  background:var(--ground); border:1px solid var(--line); border-radius:2px; padding:8px 10px;
+  margin-bottom:10px; overflow-x:auto}
+.cmet{font-size:12px; color:var(--ink-3)}
+.cwatch{font-size:12.5px; color:var(--ink-2); background:var(--warn-soft); border-left:3px solid var(--warn);
+  border-radius:2px; padding:8px 10px}
+
+/* reference bars sit above the split; cap the framework panel so it does not sprawl */
+#fwcard{margin-top:12px}
+#fwcard .fwpanel{max-width:1040px}
+
+/* the sticky column must never be taller than the screen, or its lower cards
+   become unreachable — that is how the framework card went missing */
+.canvaswrap.flow{position:static}
+@media(max-width:900px){.canvaswrap{position:static}}
+#factcard details{margin:0}
+#factcard summary{list-style:none; cursor:pointer; display:flex; align-items:center; gap:8px}
+#factcard summary::-webkit-details-marker{display:none}
+#factcard summary::after{content:"fold"; font-family:"IBM Plex Mono",monospace; font-size:9px;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); margin-left:auto}
+#factcard details:not([open]) summary::after{content:"open"}
+#factcard summary:focus-visible{outline:2px solid var(--accent); outline-offset:3px}
+#factcard details:not([open]) .toolhead{margin-bottom:0}
+#factcard .count{font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.06em;
+  color:var(--ink-3); border:1px solid var(--line-2); border-radius:9px; padding:1px 6px}
+#factcard{margin-top:14px}
+
+/* framework trees */
+.fwtrees{display:flex; flex-direction:column; gap:14px; margin-top:12px}
+.fwtree{border:1px solid var(--line); border-radius:3px; padding:11px 12px 12px; background:var(--ground)}
+.fwtree > .lab{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.09em;
+  font-weight:600; text-transform:uppercase; color:var(--ink-2); display:block; margin-bottom:9px}
+.fwkey{display:flex; flex-wrap:wrap; gap:4px 14px; margin-top:10px;
+  padding-top:9px; border-top:1px solid var(--line)}
+.fwkey span{display:inline-flex; align-items:center; gap:5px; font-size:10.5px; color:var(--ink-3)}
+.fwkey i{width:13px; height:11px; border-radius:2px; display:inline-block}
+.fwkey i.same{background:var(--panel); border:1px solid var(--line-2)}
+.fwkey i.changed{background:var(--accent-soft); border:1.5px solid var(--accent)}
+.fwkey i.added{background:var(--accent); border:1.5px solid var(--accent)}
+.fwkey i.dropped{background:var(--panel); border:1px dashed var(--line-2); opacity:.6}
+.fwann{margin-top:13px; display:grid; gap:7px}
+.fwannrow{display:grid; grid-template-columns:minmax(96px,150px) minmax(0,1fr); gap:4px 14px;
+  align-items:baseline}
+@media(max-width:620px){.fwannrow{grid-template-columns:1fr}}
+.fwannrow b{font-size:11.5px; font-weight:600; color:var(--ink)}
+.fwannrow span{font-size:12.5px; line-height:1.5; color:var(--ink-2)}
+.fwannhd{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.09em;
+  font-weight:600; text-transform:uppercase; color:var(--ink-2); margin-bottom:-1px}
+
+/* light / auto / dark switch */
+.tint .mode{display:inline-flex; margin-left:auto; border:1px solid var(--line-2);
+  border-radius:3px; overflow:hidden}
+.tint .mode button{width:auto; height:auto; border-radius:0; border:0; padding:3px 9px;
+  font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--ink-3); background:var(--panel); cursor:pointer}
+.tint .mode button + button{border-left:1px solid var(--line-2)}
+.tint .mode button[aria-pressed="true"]{background:var(--accent); color:var(--on-accent); box-shadow:none}
+.tint .mode button:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
+
+/* framework tree: zoom + hand pan */
+.fwview{position:relative; aspect-ratio:var(--ar,3/1); max-height:min(70vh,560px);
+  min-height:230px; overflow:hidden;
+  border:1px solid var(--line); border-radius:2px; background:var(--panel);
+  cursor:grab; touch-action:none; user-select:none}
+.fwview.drag{cursor:grabbing}
+.fwview:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.fwview svg{display:block; width:100%; height:100%; max-width:none}
+.fwzoom{position:absolute; right:7px; top:7px; display:flex; align-items:center; gap:2px;
+  background:var(--panel); border:1px solid var(--line-2); border-radius:3px; padding:2px;
+  box-shadow:var(--shadow)}
+.fwzoom button{font-family:"IBM Plex Mono",monospace; font-size:11px; line-height:1;
+  min-width:24px; height:22px; padding:0 6px; border:0; border-radius:2px; cursor:pointer;
+  background:transparent; color:var(--ink-2)}
+.fwzoom button:hover{background:var(--accent-soft); color:var(--ink)}
+.fwzoom button:focus-visible{outline:2px solid var(--accent); outline-offset:-1px}
+.fwzoom .pct{font-family:"IBM Plex Mono",monospace; font-size:9.5px; color:var(--ink-3);
+  min-width:38px; text-align:center}
+.fwtree > .lab{display:flex; align-items:baseline; gap:12px}
+.fwhint{margin-left:auto; font-style:normal; white-space:nowrap; text-transform:none;
+  letter-spacing:.02em; opacity:.8; transition:opacity .2s}
+#fwcard.moved .fwhint{opacity:0}
+@media(max-width:620px){.fwhint{display:none}}
+@media(max-width:620px){.fwhint{display:none}}
+
+/* plain-English hover */
+.fwnode{cursor:help}
+.fwnode.hi > rect{stroke:var(--accent); stroke-width:2.6}
+/* above any floated peek window: a floated peek's inline z-index (set by its own raise()) always
+   beats a plain stylesheet rule no matter the number, so this has to sit well clear of that range */
+.fwtip{position:fixed; z-index:500; max-width:330px; background:var(--panel);
+  border:1px solid var(--line-2); border-radius:3px; padding:10px 12px 11px;
+  box-shadow:var(--shadow); pointer-events:none; opacity:0; transition:opacity .12s}
+.fwtip[data-on="1"]{opacity:1}
+.fwtip h5{font-family:"Spectral",Georgia,serif; font-size:14px; font-weight:600;
+  margin:0 0 5px; color:var(--ink)}
+.fwtip p{margin:0; font-size:12.5px; line-height:1.5; color:var(--ink-2)}
+.fwtip .ex{margin-top:6px; font-size:12px; color:var(--ink-3); font-style:italic}
+.fwtip .here{margin-top:8px; padding-top:7px; border-top:1px solid var(--line)}
+.fwtip .here .lb{font-family:"IBM Plex Mono",monospace; font-size:8.5px; letter-spacing:.11em;
+  text-transform:uppercase; color:var(--ink-3); display:block; margin-bottom:3px}
+.fwtip .here p{color:var(--ink)}
+.fwtip .flag{display:inline-block; margin-top:7px; font-family:"IBM Plex Mono",monospace;
+  font-size:8.5px; letter-spacing:.09em; text-transform:uppercase; padding:2px 6px;
+  border-radius:2px; background:var(--accent-soft); color:var(--ink)}
+.fwtip .flag.dropped{background:var(--ground); color:var(--ink-3)}
+/* The step panel is now a resizable column, so its inner grids must respond to their
+   own width rather than to the window's. Without this, collapsing or narrowing the left
+   column changed the space available and nothing inside reflowed to use it. */
+.stepbody{container-type:inline-size; container-name:step}
+@container step (max-width:640px){
+  .cols2{grid-template-columns:1fr}
+  .railgrid{grid-template-columns:1fr}
+}
+@container step (max-width:430px){
+  .kv{grid-template-columns:1fr; gap:1px 0}
+  .kv .k{margin-top:6px}
+  .askrow{grid-template-columns:1fr}
+  .askrow .why{grid-column:1}
+  .askrow .reveals{grid-column:1}
+  .calcrow{grid-template-columns:1fr}
+  .calcrow .r{text-align:left}
+}
+/* the shade slider */
+.tint .shade{display:flex; align-items:center; gap:9px; margin-left:auto}
+.tint .shade input[type="range"]{-webkit-appearance:none; appearance:none; width:132px;
+  height:14px; background:transparent; cursor:pointer; margin:0}
+.tint .shade input[type="range"]::-webkit-slider-runnable-track{height:6px; border-radius:3px;
+  border:1px solid var(--line-2);
+  background:linear-gradient(to right,#f7f5f1,#d1cdc7 46%,#2d2b34 56%,#141319)}
+.tint .shade input[type="range"]::-moz-range-track{height:6px; border-radius:3px;
+  border:1px solid var(--line-2);
+  background:linear-gradient(to right,#f7f5f1,#d1cdc7 46%,#2d2b34 56%,#141319)}
+.tint .shade input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none; appearance:none;
+  width:14px; height:14px; border-radius:50%; background:var(--panel);
+  border:2px solid var(--accent); margin-top:-5px; box-shadow:0 1px 2px rgba(0,0,0,.3)}
+.tint .shade input[type="range"]::-moz-range-thumb{width:14px; height:14px; border-radius:50%;
+  background:var(--panel); border:2px solid var(--accent); box-shadow:0 1px 2px rgba(0,0,0,.3)}
+.tint .shade input[type="range"]:focus-visible{outline:2px solid var(--accent); outline-offset:3px}
+.tint .shade .snm{font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--ink-2); min-width:62px}
+/* the richer, pinnable node card */
+.fwtip{max-width:390px}
+.fwtip .ctx{margin-top:9px; padding-top:8px; border-top:1px solid var(--line);
+  display:flex; flex-direction:column; gap:7px}
+.fwtip .ctx .row{display:block}
+.fwtip .ctx .lb{font-family:"IBM Plex Mono",monospace; font-size:8.5px; letter-spacing:.11em;
+  text-transform:uppercase; color:var(--ink-3); display:block; margin-bottom:2px}
+.fwtip .ctx p{margin:0; font-size:12px; line-height:1.45; color:var(--ink)}
+.fwtip .ctx .calc{font-family:"IBM Plex Mono",monospace; font-size:11.5px;
+  background:var(--ground); border:1px solid var(--line); border-radius:2px;
+  padding:5px 7px; color:var(--ink); overflow-x:auto}
+.fwtip .ctx .why p{color:var(--ink)}
+.fwtip .ctx .why{border-left:3px solid var(--accent); padding-left:8px}
+.fwtip .ctx .prov{display:grid; grid-template-columns:58px minmax(0,1fr); gap:8px; margin:0 0 3px;
+  font-size:12px; line-height:1.4}
+.fwtip .ctx .prov:last-child{margin-bottom:0}
+.fwtip .ctx .prov i{font-style:normal; font-family:"IBM Plex Mono",monospace;
+  font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3);
+  padding-top:2px}
+.fwtip .ctx .mental{border-left:3px solid var(--line-2); padding-left:8px}
+.fwtip .ctx .mental p{color:var(--ink-2); font-style:italic}
+.fwtip .pin{position:absolute; top:5px; right:6px; width:19px; height:19px; padding:0;
+  border-radius:50%; border:1px solid var(--line-2); background:var(--panel);
+  color:var(--ink-3); font-family:"IBM Plex Mono",monospace; font-size:11px; line-height:1;
+  display:none; align-items:center; justify-content:center; cursor:pointer}
+.fwtip.pinned{pointer-events:auto; max-height:min(76vh,620px); overflow-y:auto}
+.fwtip.pinned .pin{display:flex}
+.fwtip.pinned{box-shadow:0 2px 4px rgba(0,0,0,.14), 0 18px 46px -22px rgba(0,0,0,.55)}
+.fwtip .hint{margin-top:8px; font-family:"IBM Plex Mono",monospace; font-size:8.5px;
+  letter-spacing:.09em; text-transform:uppercase; color:var(--ink-3); opacity:.85}
+.fwtip.pinned .hint{display:none}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+
+/* whole-page hand pan: hold Space, drag anywhere to scroll the document */
+html.panning, html.panning *{cursor:grabbing !important; user-select:none}
+
+/* kept from block one, dropped by the copies */
+.spark{min-width:0}
+.chip.none{border-style:dashed}
+
+/* ---- terms: phrases, SVG text, exhibit hotspots (2026-09-25) ---- */
+.term.phr{border-bottom:1px solid color-mix(in srgb, var(--accent) 55%, transparent); padding-bottom:1px}
+.term.phr .term{border-bottom:1px dotted color-mix(in srgb, var(--ink-3) 55%, transparent); padding-bottom:0}
+tspan.term{border-bottom:0; text-decoration:underline dotted; text-decoration-thickness:1px; text-underline-offset:2px;
+  text-decoration-color:color-mix(in srgb, currentColor 60%, transparent); cursor:help}
+.exbox .exterm{position:absolute; border-bottom:1.5px dotted color-mix(in srgb, var(--accent) 70%, transparent); cursor:help; z-index:1}
+.exbox .exterm:hover{background:color-mix(in srgb, var(--accent) 16%, transparent); border-bottom-color:var(--accent)}
+.fwtip .here.parts p{margin:0 0 3px}
+.fwtip .here.parts b{font-weight:600}
+
+/* ---- reveal-on-ask + notes provenance ---- */
+.askrow .reveals .askit{display:none; margin:2px 0 0; padding:5px 12px; font:600 12px "Public Sans",sans-serif; color:var(--on-accent);
+  background:var(--accent); border:0; border-radius:3px; cursor:pointer}
+.askrow .reveals.gated .askit{display:inline-block}
+.askrow .reveals.gated .kv{display:none}
+.askrow .reveals.gated .rlab::after{content:" \2014  the case answers only if you ask"; text-transform:none; letter-spacing:0; color:var(--ink-3)}
+.modebox{display:flex; align-items:center; gap:0; margin-top:8px}
+.modebox .lab{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.09em; text-transform:uppercase; color:var(--ink-3); margin-right:8px}
+.modebox button{font:500 12px "Public Sans",sans-serif; padding:4px 11px; color:var(--ink-2); background:transparent; border:1px solid var(--line-2); cursor:pointer}
+.modebox button:first-of-type{border-radius:3px 0 0 3px} .modebox button:last-of-type{border-radius:0 3px 3px 0; border-left:0}
+.modebox button[aria-pressed="true"]{background:var(--accent); color:var(--on-accent); border-color:var(--accent)}
+.factrow{grid-template-columns:minmax(72px,38%) minmax(0,1fr) auto}
+.pv{font:600 9px "IBM Plex Mono",monospace; letter-spacing:.06em; text-transform:uppercase; padding:1px 6px; border-radius:8px; white-space:nowrap; align-self:center}
+.pv.case{background:var(--panel-2,rgba(0,0,0,.05)); color:var(--ink-3); border:1px solid var(--line-2)}
+.pv.asked{background:var(--accent-soft); color:var(--accent)}
+.pv.derived{background:var(--ours-soft); color:var(--ours)}
+.provkey{display:flex; gap:6px; flex-wrap:wrap; margin:0 0 9px}
+@media (max-width:760px){ .factrow{grid-template-columns:minmax(72px,42%) 1fr} .factrow .pv{grid-column:2; justify-self:start} }
+
+/* ---- layout round: sticky frameworks strip, centred rail, side dock ---- */
+.split.emptycanvas{grid-template-columns:0 12px minmax(0,1fr)}
+.split.emptycanvas .canvaswrap{visibility:hidden; overflow:hidden; max-width:0}
+#fwcard{position:sticky; top:calc(env(safe-area-inset-top,0px) + 6px); z-index:40; max-height:46vh;
+  display:flex; flex-direction:column; box-shadow:0 6px 14px -8px rgba(0,0,0,.25)}
+#fwcard > .toolhead, #fwcard > .fwbar{flex:0 0 auto}
+/* the tab row never scrolls away: only the opened framework's own panel scrolls when it outgrows the card */
+#fwcard .fwpanel{flex:1 1 auto; min-height:0; overflow:auto}
+.canvaswrap{top:calc(env(safe-area-inset-top,0px) + 12px + var(--stripH,0px))}
+@media(min-width:1100px){
+  .steps{top:max(calc(12px + var(--stripH,0px)), calc(50vh - var(--rh,120px)/2))}
+  .wrap{padding-right:52px}
+}
+#dock{position:fixed; right:8px; top:50%; transform:translateY(-50%); z-index:45; display:flex; flex-direction:column;
+  gap:8px; align-items:flex-end; max-height:calc(100vh - 24px)}
+.peek{background:var(--panel); border:1px solid var(--line-2); border-radius:4px; box-shadow:0 6px 18px -10px rgba(0,0,0,.4);
+  width:clamp(88px, calc((100vw - 1260px)/2 - 10px), 176px); overflow:hidden; cursor:pointer;
+  transition:width .16s ease, box-shadow .16s}
+.peek header{display:flex; align-items:baseline; justify-content:space-between; gap:6px; padding:6px 9px;
+  font:600 10px "IBM Plex Mono",monospace; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-2)}
+.peek .pc{color:var(--accent); font-weight:600}
+.peek .pbody{max-height:0; overflow:hidden}
+/* collapsed thumbnails: the tree shows small, the notes show only their heading and count */
+.peek#peekTree:not(.open) .pbody{max-height:96px; padding:0 6px 6px; pointer-events:none}
+.peek#peekTree:not(.open) #tree{width:100%; height:auto}
+.peek#peekTree:not(.open) #treecap{display:none}
+.peek:not(.open) #factcard{display:none}
+@media(max-width:1499px){ .peek{width:96px} .peek#peekTree:not(.open) .pbody{max-height:0; padding:0} }
+.peek.open{width:clamp(380px, 44vw, 660px); box-shadow:0 18px 40px -12px rgba(0,0,0,.5); cursor:default}
+.peek.open .pbody{max-height:calc(100vh - 150px); overflow:auto; padding:4px 10px 10px}
+.peek.open #treecap{display:block}
+.peek .pclose{display:none; margin-left:auto; border:0; background:transparent; color:var(--ink-2); font:600 13px/1 "IBM Plex Mono",monospace; cursor:pointer; padding:3px 6px; border-radius:3px}
+.peek .pclose:hover{background:var(--accent-soft); color:var(--accent)}
+.peek .pclose:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+.peekph{flex:none}
+/* a lifted-out (floating) peek: fixed to the screen, movable and resizable; the page behind keeps scrolling */
+.peek.float{position:fixed; z-index:60; display:flex; flex-direction:column; max-width:none; cursor:default; transition:none;
+  box-shadow:0 22px 50px -14px rgba(0,0,0,.55); border-color:var(--accent-line, var(--line-2))}
+.peek.float .pclose{display:inline-block}
+.peek.float > header{cursor:grab; flex:none; user-select:none; padding-right:20px}
+.peek.float .pbody{flex:1 1 auto; min-height:0; max-height:none; overflow:auto; cursor:grab}
+.peek.float #tree{cursor:grab}
+.peek.float #peekTree #tree, .peek#peekTree.float #tree{width:100%; height:auto; max-height:none}
+.peek.float.dragging, .peek.float.dragging *{cursor:grabbing !important; user-select:none}
+.peek.float .term, .peek.float .fwnode, .peek.float a, .peek.float button, .peek.float summary{cursor:pointer}
+.rz{position:absolute; z-index:5; touch-action:none; background:transparent}
+.rz-n,.rz-s{left:14px; right:14px; height:8px; cursor:ns-resize} .rz-n{top:0} .rz-s{bottom:0}
+.rz-e,.rz-w{top:14px; bottom:14px; width:10px; cursor:ew-resize} .rz-e{right:0} .rz-w{left:0}
+.rz-ne,.rz-nw,.rz-se,.rz-sw{width:14px; height:14px}
+.rz-ne{top:0; right:0; cursor:nesw-resize} .rz-nw{top:0; left:0; cursor:nwse-resize}
+.rz-se{bottom:0; right:0; cursor:nwse-resize} .rz-sw{bottom:0; left:0; cursor:nesw-resize}
+.peek.float .rz:hover{background:var(--accent-soft)}
+.rz-se::after{content:""; position:absolute; right:3px; bottom:3px; width:9px; height:9px; border-right:2px solid var(--ink-3); border-bottom:2px solid var(--ink-3); opacity:.7}
+.peek #factcard, .peek .card{margin:0; border:0; box-shadow:none; background:transparent; padding:0}
+.peek #tree{display:block; width:100%; height:auto}
+.peek:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+@media(max-width:1099px){
+  #dock{position:static; transform:none; margin:16px; max-height:none; align-items:stretch}
+  .peek, .peek.open{width:auto} .peek .pbody, .peek.open .pbody{max-height:none; overflow:visible; padding:4px 12px 12px}
+  .peek .pclose{display:none !important}
+  .peek:not(.open) #factcard{display:block} .peek:not(.open) #treecap{display:block}
+  .peek#peekTree:not(.open) .pbody{max-height:none; padding:4px 12px 12px; pointer-events:auto}
+}
+/* the dock header already says "Notes so far" and the count; the card's own title row would repeat it */
+.peek #factcard > details > summary{display:none}
+@media(max-width:1099px){ .peek #factcard > details > summary{display:flex} }

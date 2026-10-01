@@ -1,0 +1,69 @@
+
+<title>Block One</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;0,700;1,400&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="shell.css">
+<div class="wrap">
+<header class="page">
+  <p class="eyebrow">Spine steps 1–5 · Booth 2025</p>
+  <h1>Block One</h1>
+  <p class="lede">Five cases in the order the index put them, built to show the buildup rather than the
+  cases. One difficulty dial turns at a time where the corpus allows it; where it doesn't, the jump is
+  marked and a bridge is written in. The toolkit at the top fills as you go.</p>
+  <p class="tiers">
+    <span><span class="tick src"></span><b>Source</b> — the casebook's own words and numbers</span>
+    <span><span class="tick res"></span><b>Restructured</b> — same content, our arrangement</span>
+    <span><span class="tick our"></span><b>Ours</b> — notes the casebook doesn't contain</span>
+  </p>
+  <div class="tint" id="tint"><span class="lab">Page tint</span></div>
+</header>
+
+<p class="lede" style="margin-top:12px">Every step is structured the same way: <b>what you have</b>, <b>what to ask for and why</b> — tagged clarify, unlock or test — <b>what you still won't have</b>, then the chain of arithmetic or the chain of reasoning. Source and notes are split into labelled rows rather than prose. "What you have" is only ever what the case hands over unprompted — an <b>unlock</b> question that pays off shows what it reveals directly underneath it, so a fact you'd have to ask for never looks like one you were just given.</p>
+
+<div class="card ramp">
+  <h3>What each case turns up — and what it leaves alone</h3>
+  <div class="sparks" id="sparks"></div>
+</div>
+
+<div class="card toolkit" id="toolkit"></div>
+<div class="card tools" id="fwcard" hidden></div>
+
+<div class="rail" id="rail"></div>
+<div id="bridge"></div>
+
+<div class="split" id="split">
+  <div class="canvaswrap">
+    <div class="card canvas">
+      <svg id="tree" viewBox="0 0 660 300" role="img" aria-label="The shared canvas for this case"></svg>
+      <div class="figure"><svg id="fig" viewBox="0 0 660 200" role="img" aria-label="Step figure"></svg></div>
+      <p class="figcap" id="figcap"></p>
+    </div>
+    <div class="card tools" id="factcard"></div>
+    <p class="figcap" id="treecap" style="padding:8px 2px 0">The same nine boxes sit in the same places in
+      every case. What changes is which ones the case lights up — and two of these five never fill in a
+      single number.</p>
+  </div>
+  <div class="splitter" id="splitter" role="separator" aria-orientation="vertical"
+       aria-label="Resize the left column"><button type="button" id="splitcollapse"
+       title="Hide the left column">&#8249;</button></div>
+  <div class="bodycol">
+    <div class="steps" id="steps"></div>
+    <div class="card"><div class="stepbody" id="body"></div></div>
+  </div>
+</div>
+
+<footer>
+  Every prompt, figure, question and model answer belongs to Booth 2025 and is page-anchored to it. The
+  canvas, the sequence, the dials, the ask-lists and the bridges are ours. Where the casebook's own
+  arithmetic or logic doesn't hold, its answer is left standing and the objection sits beside it.
+</footer>
+</div>
+<script src="terms.js"></script>
+<script src="canvctx.js"></script>
+<script src="nodectx.js"></script>
+<script src="fwbase.js"></script>
+<script src="palette.js"></script>
+<script src="srcfirst.js"></script>
+<script src="data.js"></script>
+<script src="exterms.js"></script>
+<script src="shell.js"></script>
+
