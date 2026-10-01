@@ -1698,15 +1698,46 @@ if(window.visualViewport){
    whichever direction there is anywhere to go — including sideways, which is the case
    this is mainly for (a wide panel run off the right edge). "Empty space" means: not a
    control, not the framework tree or a peek window (they already have their own drag),
-   and not a text-bearing element, so clicking/selecting text still works as normal.
+   and not an actual rendered character, so clicking/selecting text still works as normal.
    If the drag starts over a panel with its own scrollbar (a grid that didn't fit, an
    exhibit table) rather than over the page itself, that panel pans instead of the page —
-   whichever one actually has somewhere to go in that direction. */
+   whichever one actually has somewhere to go in that direction.
+
+   "Not a text-bearing element" used to mean the whole tag — P, LI, TD and so on — was
+   off limits, on the theory that those are where prose lives. In practice the content
+   card is nearly wall-to-wall <p>/<li> elements, so that blocked panning almost
+   everywhere inside it: the blank line-height gap between two lines of a paragraph, and
+   the padding around a list, are still physically inside a <p> or <li> box even though
+   no glyph is drawn there — exactly the "works in the background strips, not in the
+   content card" bug reported. The fix checks the actual pixel instead of the tag:
+   caretRangeFromPoint/caretPositionFromPoint finds the nearest character to the pointer,
+   and a one-character range around it gives that character's real on-screen box. Only a
+   press that lands inside that box counts as "on text"; every other pixel inside the
+   same <p> — margin, leading, trailing whitespace — is empty space and pans like
+   anywhere else. */
 (function pagePan(){
   const SKIP = 'button,a,input,textarea,select,[contenteditable="true"],label,.term,.fwview,.peek,#dock,.rz,.askit';
-  const TEXT_TAGS = new Set(['P','SPAN','LI','TD','TH','H1','H2','H3','H4','H5','H6','LABEL',
-    'STRONG','EM','B','I','SMALL','A','SUMMARY','CODE','PRE','BLOCKQUOTE','FIGCAPTION']);
-  const pannable = el => !!(el && !(el.closest && el.closest(SKIP)) && !TEXT_TAGS.has(el.tagName));
+  function overGlyph(x, y){
+    let node = null, offset = 0;
+    if(document.caretRangeFromPoint){
+      const r = document.caretRangeFromPoint(x, y);
+      if(r){ node = r.startContainer; offset = r.startOffset; }
+    } else if(document.caretPositionFromPoint){
+      const p = document.caretPositionFromPoint(x, y);
+      if(p){ node = p.offsetNode; offset = p.offset; }
+    }
+    if(!node || node.nodeType !== 3) return false;         /* no nearby text node at all: never a glyph */
+    const text = node.textContent;
+    const a = Math.max(0, offset - 1), b = Math.min(text.length, offset + 1);
+    if(a === b) return false;
+    const r = document.createRange();
+    r.setStart(node, a); r.setEnd(node, b);
+    for(const rect of r.getClientRects()){
+      if(x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) return true;
+    }
+    return false;                                           /* nearest character exists but isn't under the pointer */
+  }
+  const pannable = (el, x, y) => !!(el && !(el.closest && el.closest(SKIP)) && !overGlyph(x, y));
   const THRESH = 4;
   /* nearest ancestor (stopping at body) that can actually scroll on this axis; null means
      the page itself (window) is the one with room to move */
@@ -1727,7 +1758,7 @@ if(window.visualViewport){
   }
   let pend = null;
   document.addEventListener('pointerdown', e=>{
-    if(e.button !== 0 || !pannable(e.target)) return;
+    if(e.button !== 0 || !pannable(e.target, e.clientX, e.clientY)) return;
     const xEl = scrollAncestor(e.target, 'x'), yEl = scrollAncestor(e.target, 'y');
     pend = {
       x:e.clientX, y:e.clientY, started:false, xEl, yEl,
