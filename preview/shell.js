@@ -654,8 +654,17 @@ function buildRailToggle(){
   b.addEventListener('click', e=>{
     e.stopPropagation();
     if(open){ closeRail(); manualOverride = false; sync(); return; } /* 2nd click while open: fully restore the rail */
-    if(collapsed){ openRail(); return; }                             /* already collapsed, closed: show the flyout */
-    manualOverride = true; sync();                                   /* full rail showing: collapse it by hand */
+    /* The button is the only reliable path for zoom methods auto-detection can't see
+       at all (OS-level magnification, some trackpad pinches) — see the comment above
+       rawAuto(). For those, `collapsed` is still false the first time the reader clicks,
+       because nothing ever told us to flip it. Previously that meant the first click
+       only collapsed the (possibly already out-of-view) full rail, with nothing visibly
+       happening, and the flyout only appeared on a second click. A single click on this
+       always-visible button should always produce the flyout the reader is asking for,
+       collapsing the full rail first if auto-detection hadn't already done it, in the
+       same click rather than requiring a second one. */
+    if(!collapsed){ manualOverride = true; sync(); }
+    openRail();
   });
   window.addEventListener('resize', sync);
   /* belt and braces: some browsers don't fire 'resize' for every page-zoom change, so also
