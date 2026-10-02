@@ -1838,7 +1838,20 @@ if(window.visualViewport){
   pz.appendChild(layer);
   layer.appendChild(wrap);
 
-  const SKIP = 'button,a,input,textarea,select,[contenteditable="true"],label,.term,.fwview,.peek,#dock,.rz,.askit';
+  /* Two different exclusion lists for two different situations - conflating them is what
+     caused the "navigation keeps getting interrupted whenever the cursor passes over a
+     term or button" bug (see the comment by the plain-wheel pan listener below for the
+     full diagnosis). DRAG_SKIP guards where a CLICK-DRAG may start: starting one on top
+     of a term, a button, a link, or form control should let that element's own click/
+     select/focus behavior happen instead of being hijacked into a pan, so it stays broad.
+     WHEEL_SKIP guards something narrower and unrelated: which elements have their OWN
+     independent scroll/pan surface that a page-wide wheel-pan must not fight with (the
+     framework canvas's own pan/zoom, the dock's internal layout). A term or a button has
+     no such competing surface - wheel-scrolling over one should simply pan the page like
+     wheel-scrolling over any other text, exactly as it would if the SKIP list did not
+     exist at all. */
+  const DRAG_SKIP = 'button,a,input,textarea,select,[contenteditable="true"],label,.term,.fwview,.peek,#dock,.rz,.askit';
+  const WHEEL_SKIP = '.fwview,.peek,#dock';
   function overGlyph(x, y){
     let node = null, offset = 0;
     if(document.caretRangeFromPoint){
@@ -1859,7 +1872,7 @@ if(window.visualViewport){
     }
     return false;                                           /* nearest character exists but isn't under the pointer */
   }
-  const pannable = (el, x, y) => !!(el && !(el.closest && el.closest(SKIP)) && !overGlyph(x, y));
+  const pannable = (el, x, y) => !!(el && !(el.closest && el.closest(DRAG_SKIP)) && !overGlyph(x, y));
   /* nearest ancestor (stopping at body) that can actually scroll on this axis; null means
      the page/pagezoom wrapper itself is the one with room to move */
   function scrollAncestor(el, axis){
@@ -1980,12 +1993,29 @@ if(window.visualViewport){
   }, {passive:false});
 
   /* an ordinary two-finger scroll, once zoomed in, pans — #pagezoom is fixed/non-scrolling
-     in that state, so without this the only way to move would be click-drag */
+     in that state, so without this the only way to move would be click-drag.
+
+     THE ROOT CAUSE of "navigation keeps getting interrupted whenever the cursor passes
+     over a term or button": this used to check the same broad DRAG_SKIP list that guards
+     where a click-drag may start (button,a,input,…,.term,…) — reasonable for a drag,
+     where starting on a term should let it be clicked/selected instead of hijacked into a
+     pan, but wrong here. A wheel event does not click or select anything, so there was
+     nothing to protect; the broad check just made every wheel tick whose target happened
+     to be a term or a button a silent no-op — no pan, no preventDefault, nothing — while
+     every tick whose target was plain text panned normally. In real continuous scrolling
+     across a page that is mostly defined terms and buttons, the cursor crosses one on a
+     meaningful fraction of ticks, which reads exactly as "navigation keeps grabbing me":
+     the page visibly sticks for an instant on every single term or button it slides past,
+     over and over. WHEEL_SKIP is the fix — it only excludes the few elements with their
+     own independent pan/scroll surface this must not fight with (the framework canvas,
+     the dock); everything else, term and button included, now pans like plain text always
+     did. An inner panel with its own real scrollable overflow is still deferred to by the
+     scrollAncestor check right below, unchanged. */
   window.addEventListener('wheel', e=>{
     if(e.ctrlKey) return;
     plainTicks++;
     if(!active){ dbgUpdate(); return; }
-    if(e.target && e.target.closest && e.target.closest(SKIP)){ dbgUpdate(); return; }
+    if(e.target && e.target.closest && e.target.closest(WHEEL_SKIP)){ dbgUpdate(); return; }
     if(scrollAncestor(e.target, 'x') || scrollAncestor(e.target, 'y')){ dbgUpdate(); return; } /* an inner panel's own scrollbar handles it */
     e.preventDefault();
     tx -= e.deltaX / k; ty -= e.deltaY / k;
