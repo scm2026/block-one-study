@@ -1732,10 +1732,33 @@ if(window.visualViewport){
 (function pageZoom(){
   const wrap = document.querySelector('body > .wrap');
   if(!wrap) return;
+  /* Two nested elements, not one, and this split is the fix for the "zoom breaks the page —
+     huge blank strip opens, content jumps far to one side" regression. #pagezoom is the
+     viewport-fixed CLIP WINDOW only: at rest it's a normal in-flow box, and once zoomed it
+     becomes position:fixed;inset:0;overflow:hidden so the pan math has simple
+     viewport-relative numbers — but it is never itself transformed. #pzlayer, a plain
+     statically-positioned child of it, is the one that actually receives
+     `transform:scale(k) translate(tx,ty)`. Those two responsibilities were wrongly combined
+     on one element in the previous version: applying the transform directly to the same box
+     that also had position:fixed;inset:0 meant the fixed box's own on-screen position moved
+     with it, since position:fixed already pins that box to the viewport before the
+     transform is even considered — scaling/translating it then drags the whole viewport-
+     sized box (and the clip region that comes with it) off to the side, so almost nothing
+     of the real content was left inside the viewport to paint at all. That's exactly the
+     "mostly blank, content jumps/shifts" symptom: confirmed by sampling 9 points across the
+     screen after several zoom ticks and finding the transformed box's own bounding rect
+     (DevTools getBoundingClientRect) entirely outside the 0..innerHeight range — i.e. the
+     content wasn't misplaced inside a stable window, the window itself had been pushed off-
+     screen. Keeping the fixed clip window untransformed and moving only the inner layer
+     fixes this: the clip window's screen position never changes once engaged, and panning/
+     zooming only ever moves content within it. */
   const pz = document.createElement('div');
   pz.id = 'pagezoom';
   wrap.parentNode.insertBefore(pz, wrap);
-  pz.appendChild(wrap);
+  const layer = document.createElement('div');
+  layer.id = 'pzlayer';
+  pz.appendChild(layer);
+  layer.appendChild(wrap);
 
   const SKIP = 'button,a,input,textarea,select,[contenteditable="true"],label,.term,.fwview,.peek,#dock,.rz,.askit';
   function overGlyph(x, y){
@@ -1800,12 +1823,43 @@ if(window.visualViewport){
       + `last drag: ${lastDrag}`;
   }
 
-  function apply(){ pz.style.transform = active ? `scale(${k}) translate(${tx}px, ${ty}px)` : ''; dbgUpdate(); }
+  function apply(){ layer.style.transform = active ? `scale(${k}) translate(${tx}px, ${ty}px)` : ''; dbgUpdate(); }
+  /* Bounds tx/ty to where the content actually has room to go — it must never FORCE a
+     value, only constrain one already set by engage()/zoomAt()/a drag. The previous
+     version re-centered tx/ty the instant content was narrower than the viewport at the
+     current zoom (cw*k <= vw), which is almost always true the moment a zoom gesture
+     starts (k is barely above 1, so cw*k ≈ cw ≈ vw). That silently overwrote the
+     scroll-preserving tx/ty engage() had just set, with a centering offset that has
+     nothing to do with where the reader actually was — a visible jump on literally the
+     first zoom tick, which is the "content shifts right, blank strip opens on the left"
+     bug. Pinning to 0 when there's no room to pan is the correct no-op here: scrollX/
+     scrollY can only have been nonzero in the first place if there WAS real overflow to
+     scroll, so if there isn't any at this zoom level, 0 is also what engage() would have
+     captured. */
+  /* The previous version of this still pinned tx/ty to a single forced value — 0 — any
+     time content was narrower than the room available at the current zoom (vw/k - cw
+     positive), which collapses BOTH the min and max bound to the same point and discards
+     whatever tx the zoom-to-pointer math in zoomAt() had just computed. That's a second
+     instance of the same bug class as the centering one: real-world content is routinely
+     narrower than vw/k right after a small zoom-in tick (k is barely above 1), so this
+     fired almost every time, snapping a correctly zoom-anchored tx back to 0 and
+     producing exactly the "jumps/shifts right" symptom — confirmed by tracking one
+     specific DOM node's screen position across a single zoom tick: vertically it stayed
+     put (that axis wasn't hitting this), horizontally it jumped ~26px even though the
+     zoom was centered on it.
+
+     The actual requirement is much more permissive than "pin to a resting position": tx/
+     ty should only be stopped from pushing the content fully off one edge of the screen —
+     never forced toward any particular value otherwise. Content's left edge is at tx*k;
+     it must stay <= vw (not pushed past the right edge) and its right edge, (cw+tx)*k,
+     must stay >= 0 (not pushed past the left edge) — giving tx ∈ [-cw, vw/k]. Same logic
+     for ty. This bounds runaway panning without ever overriding a value zoomAt() or a
+     drag legitimately set. */
   function clampPan(){
     const vw = window.innerWidth, vh = window.innerHeight;
     const cw = wrap.scrollWidth, ch = wrap.scrollHeight;
-    tx = (cw * k <= vw) ? (vw / k - cw) / 2 : Math.min(0, Math.max(vw / k - cw, tx));
-    ty = (ch * k <= vh) ? (vh / k - ch) / 2 : Math.min(0, Math.max(vh / k - ch, ty));
+    tx = Math.min(vw / k, Math.max(-cw, tx));
+    ty = Math.min(vh / k, Math.max(-ch, ty));
   }
   function engage(){
     active = true;
@@ -1914,7 +1968,7 @@ if(window.visualViewport){
      buildRailToggle's rawAuto() below, so the burger doesn't regress now that the old
      signals it relied on (innerWidth, devicePixelRatio, the raw gesture tally) are
      superseded by this for anyone using this zoom path */
-  window.PZ = { get k(){ return k; }, get active(){ return active; } };
+  window.PZ = { get k(){ return k; }, get active(){ return active; }, get tx(){ return tx; }, get ty(){ return ty; }, get wrapScrollWidth(){ return wrap.scrollWidth; } };
 })();
 
 render();
