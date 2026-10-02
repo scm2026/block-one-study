@@ -801,7 +801,7 @@ function buildDock(){
     else dock.appendChild(w);
   };
   let t = null;
-  dock.addEventListener('mouseover', e=>{ const w = e.target.closest('.peek'); if(!w) return; clearTimeout(t); t = setTimeout(()=>{ dock.querySelectorAll('.peek.open').forEach(x=>{ if(x!==w) x.classList.remove('open'); }); w.classList.add('open'); }, 90); });
+  dock.addEventListener('mouseover', e=>{ if(window.NAV_ACTIVE) return; const w = e.target.closest('.peek'); if(!w) return; clearTimeout(t); t = setTimeout(()=>{ if(window.NAV_ACTIVE) return; dock.querySelectorAll('.peek.open').forEach(x=>{ if(x!==w) x.classList.remove('open'); }); w.classList.add('open'); }, 90); });
   dock.addEventListener('mouseout', e=>{ const w = e.target.closest('.peek'); if(!w || w.contains(e.relatedTarget)) return; clearTimeout(t); w.classList.remove('open'); });
   dock.addEventListener('click', e=>{ const w = e.target.closest('.peek'); if(!w) return;
     if(e.target.closest('summary, a, button, .term, .fwnode')) return;          /* clicks on the content itself do their own thing */
@@ -1196,6 +1196,84 @@ let termTouch = false;
 document.addEventListener('pointerdown', e=>{ termTouch = (e.pointerType === 'touch'); },
                           {capture:true, passive:true});
 
+/* ---------------- navigation-mode hover suppression (preview only) ----------------
+   Moving around with a trackpad - panning, zooming, an ordinary two-finger scroll -
+   routinely drags the cursor across a defined term, a button, or the framework canvas,
+   and every one of those has its own hover-triggered popup (the term tooltip, the
+   dock's hover-enlarge, a framework/canvas node's gloss card). None of that is
+   intentional interaction - it is the cursor incidentally passing over something on the
+   way elsewhere, and without this, that is indistinguishable from someone resting the
+   pointer on purpose: a card could pop and re-pop on every tick as content slides
+   underneath a stationary cursor.
+
+   window.NAV_ACTIVE is a single, short-lived flag: true for as long as wheel events keep
+   arriving, and for a brief idle window after the last one (160ms - long enough to
+   bridge the gap between individual trackpad events, short enough to be gone well before
+   a reader who has actually stopped moving could rest the pointer on something on
+   purpose). It is read, not enforced: every hover-driven handler already gates on
+   existing flags (termTouch for touch devices, fwPinned once a card is pinned open)
+   before doing anything, so NAV_ACTIVE is simply added to those same early-return
+   checks. That means this never touches click, keyboard focus, or text selection - only
+   the "pop a card because the pointer happens to be over something" path is affected,
+   and only while active. Deliberately keyed off 'wheel' alone, not the generic 'scroll'
+   event - scroll also fires for the step panel's own smooth-scroll-into-view on an
+   ordinary Next/rail click, which is not trackpad navigation and should not suppress
+   anything (see the comment by the listener below). Click-drag panning has no wheel
+   events of its own, so the pageZoom click-drag handler calls this directly instead -
+   that's the one other place this is wired in, so a drag-pan across a term doesn't pop
+   its tooltip either.
+
+   It also clears whatever hover popup was already open the instant navigation starts -
+   a tooltip or peek that was open before the reader started scrolling would otherwise
+   hang there, unpinned, drifting over content that is now sliding past underneath it. A
+   pinned card (clicked open on purpose) is left alone, exactly like the existing fwPinned
+   checks elsewhere already treat it. */
+window.NAV_ACTIVE = false;
+(function navGate(){
+  const IDLE_MS = 160;
+  let timer = null;
+
+  /* TEMP DEBUG, preview only - a small readout so this is visibly testable without
+     opening devtools, same spirit as pageZoom's own on-screen k/tx/ty readout. Remove
+     alongside that one before this goes anywhere near live. */
+  const dbg = document.createElement('div');
+  dbg.id = 'navdebug';
+  dbg.style.cssText = 'position:fixed;top:4px;right:4px;z-index:99999;background:rgba(0,0,0,.75);'
+    + 'color:#fff;font:11px/1.5 monospace;padding:3px 8px;border-radius:4px;pointer-events:none;'
+    + 'transform:translateY(96px)';
+  document.body.appendChild(dbg);
+  function dbgUpdate(){ dbg.textContent = 'hover ' + (window.NAV_ACTIVE ? 'SUPPRESSED (navigating)' : 'normal'); }
+
+  function start(){
+    if(!window.NAV_ACTIVE){
+      window.NAV_ACTIVE = true;
+      document.documentElement.classList.add('nav-active');
+      if(typeof fwPinned === 'undefined' || !fwPinned) fwTipHide();
+      document.querySelectorAll('.dock .peek.open').forEach(w=>{ if(!w.classList.contains('float')) w.classList.remove('open'); });
+    }
+    dbgUpdate();
+    clearTimeout(timer);
+    timer = setTimeout(stop, IDLE_MS);
+  }
+  function stop(){
+    window.NAV_ACTIVE = false;
+    document.documentElement.classList.remove('nav-active');
+    dbgUpdate();
+  }
+  dbgUpdate();
+  /* wheel only - not the generic 'scroll' event. Scroll also fires for reasons that are
+     not trackpad navigation at all: clicking Next or a step in the rail smooth-scrolls
+     the step panel into view (see "Next scrolls to the top of the step panel" elsewhere
+     in this file), and that scroll event is indistinguishable from a trackpad gesture if
+     listened to directly - it would suppress hover for a moment right after a perfectly
+     ordinary button click, which is not what this is for. Wheel events only fire for
+     actual wheel/trackpad input, so they are the correct, narrower signal; click-drag
+     panning has no wheel events of its own, which is what the explicit NAV_MARK call in
+     pageZoom's drag handler is for. */
+  window.addEventListener('wheel', start, {passive:true, capture:true});
+  window.NAV_MARK = start;
+})();
+
 
 
 /* Places a dotted underline would be noise or would break something: the chrome of the
@@ -1331,7 +1409,7 @@ function markAllTerms(){
 
 (function bindTermHover(){
   document.addEventListener('mouseover', e=>{
-    if(termTouch) return;
+    if(termTouch || window.NAV_ACTIVE) return;
     const t = e.target.closest && e.target.closest('.term'); if(!t) return;
     const g = TERMS[t.dataset.t]; if(!g) return;
     document.querySelectorAll('.fwnode.hi').forEach(x=>x.classList.remove('hi'));
@@ -1557,7 +1635,7 @@ function fwFindNode(f, id){
 (function bindFwHover(){
   const card = document.getElementById('fwcard'); if(!card) return;
   card.addEventListener('mouseover', e=>{
-    if(termTouch || fwPinned) return;
+    if(termTouch || fwPinned || window.NAV_ACTIVE) return;
     const g = e.target.closest('.fwnode'); if(!g) return;
     fwNodeTip(g);
   });
@@ -1609,7 +1687,7 @@ function fwFindNode(f, id){
     fwTipShow(g, fwTipHTML(d.t || id, gl, d.v && d.v !== '—' ? d.v : '', '', ctx));
   }
   svg.addEventListener('mouseover', e=>{
-    if(termTouch || fwPinned) return;
+    if(termTouch || fwPinned || window.NAV_ACTIVE) return;
     const g = e.target.closest('.fwnode'); if(!g) return;
     canvasNodeTip(g);
   });
@@ -1942,6 +2020,7 @@ if(window.visualViewport){
       pend.started = true;
       document.documentElement.classList.add('panning');
     }
+    if(window.NAV_MARK) window.NAV_MARK();   /* a click-drag pan has no wheel/scroll events of its own */
     e.preventDefault();
     if(pend.xEl) pend.xEl.scrollLeft = pend.sl - dx;
     if(pend.yEl) pend.yEl.scrollTop  = pend.st - dy;
