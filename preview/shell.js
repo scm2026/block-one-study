@@ -774,11 +774,42 @@ function buildDock(){
   const pt = mk('peekTree', 'Framework tree', [tree, cap]), pn = mk('peekNotes', 'Notes so far', [fact]);
   dock.append(pt, pn); document.body.appendChild(dock);
   const narrow = ()=>window.matchMedia('(max-width:1099px)').matches;
+  /* Same visualViewport pattern already proven in buildRailToggle (the burger) and
+     fwPlace/fwTipFollow (the term tooltip): position:fixed anchors to the LAYOUT viewport,
+     not the visible one, and raw innerWidth/innerHeight describe the layout viewport too —
+     neither moves when a touch pinch-zoom pans the visible window around inside a larger
+     page. That's why the burger and tooltip already stay put during an iPad pinch while
+     these floating windows drift: this clampBox was the one subsystem never given the same
+     treatment. vv.offsetLeft/offsetTop is how far the visible window has panned from the
+     layout viewport's origin; vv.width/height is its current size. getBoundingClientRect()
+     and pointer clientX/clientY are already layout-viewport-relative (same space either
+     way), so the only thing missing was bounding against the VISIBLE window instead of the
+     full layout one. */
+  const vvBounds = ()=>{
+    const vv = window.visualViewport;
+    return vv ? {L: vv.offsetLeft, T: vv.offsetTop, W: vv.width, H: vv.height}
+              : {L: 0, T: 0, W: innerWidth, H: innerHeight};
+  };
   const clampBox = (w, L, T, W, H)=>{
-    W = Math.max(PEEK_MIN_W, Math.min(W, innerWidth)); H = Math.max(PEEK_MIN_H, Math.min(H, innerHeight));
-    L = Math.min(Math.max(L, PEEK_KEEP - W), innerWidth - PEEK_KEEP); T = Math.min(Math.max(T, 0), innerHeight - 34);
+    const vb = vvBounds();
+    W = Math.max(PEEK_MIN_W, Math.min(W, vb.W)); H = Math.max(PEEK_MIN_H, Math.min(H, vb.H));
+    L = Math.min(Math.max(L, vb.L + PEEK_KEEP - W), vb.L + vb.W - PEEK_KEEP);
+    T = Math.min(Math.max(T, vb.T), vb.T + vb.H - 34);
     w.style.left = L + 'px'; w.style.top = T + 'px'; w.style.width = W + 'px'; w.style.height = H + 'px';
   };
+  /* Keep floated windows inside the visible window as it pans during a pinch-zoom, even
+     with no drag in progress — mirrors buildRailToggle's placeToggle exactly. Re-clamps
+     each floated window's current box against the (possibly now-smaller/shifted) visible
+     window; clampBox only ever constrains, never recenters, so a window already fully
+     visible is left untouched. */
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', ()=>{
+      document.querySelectorAll('.peek.float').forEach(w=>{ const r = w.getBoundingClientRect(); clampBox(w, r.left, r.top, r.width, r.height); });
+    });
+    window.visualViewport.addEventListener('scroll', ()=>{
+      document.querySelectorAll('.peek.float').forEach(w=>{ const r = w.getBoundingClientRect(); clampBox(w, r.left, r.top, r.width, r.height); });
+    });
+  }
   let zTop = 60; const raise = w=>{ w.style.zIndex = ++zTop; };
   const DIRS = ['n','s','e','w','ne','nw','se','sw'];
   const floatIt = w=>{
@@ -837,6 +868,24 @@ function buildDock(){
     if(el.closest('.pbody')) return !el.closest(PEEK_INTERACTIVE);
     return false;
   };
+  /* TEMP DEBUG — remove before this goes anywhere near live. Requested readout for
+     diagnosing the iPad "drag moves in jerks, then stops" report: whether pointer capture
+     is actually granted and still held, the full event sequence (down/move/up/cancel/
+     LOST capture — a lostpointercapture with no matching up/cancel is the signature of the
+     browser's native touch-scroll recognizer silently taking the gesture away from us
+     mid-drag), both coordinate spaces (clientX/Y vs pageX/Y) side by side so a mismatch
+     between them is visible instead of assumed, the visualViewport snapshot, and whether
+     the page-level pan handler (pageZoom) is live at the same time, which would mean two
+     systems are both trying to own the same one-finger gesture. */
+  const pdbg = document.createElement('div');
+  pdbg.id = 'peekdebug';
+  pdbg.style.cssText = 'position:fixed;top:4px;right:4px;z-index:99999;background:rgba(0,0,0,.75);'
+    + 'color:#fff;font:11px/1.5 monospace;padding:5px 8px;border-radius:4px;pointer-events:none;'
+    + 'white-space:pre;transform:translateY(192px)';
+  document.body.appendChild(pdbg);
+  let peekLog = 'no drag yet';
+  function pdbgUpdate(){ pdbg.textContent = peekLog; }
+  pdbgUpdate();
   document.addEventListener('pointerdown', e=>{
     const w = e.target.closest && e.target.closest('.peek.float'); if(!w) return;
     raise(w);
@@ -844,9 +893,23 @@ function buildDock(){
     if(e.button !== undefined && e.button > 0) return;
     e.preventDefault();
     const r = w.getBoundingClientRect(), s = {x: e.clientX, y: e.clientY, L: r.left, T: r.top, W: r.width, H: r.height}, dir = h ? h.dataset.dir : '';
-    w.classList.add('dragging'); try{ (h || w).setPointerCapture(e.pointerId); }catch(err){}
+    const cap = h || w;
+    w.classList.add('dragging'); try{ cap.setPointerCapture(e.pointerId); }catch(err){}
+    const vv = window.visualViewport;
+    const fields = ev=>{
+      const held = (()=>{ try{ return cap.hasPointerCapture(ev.pointerId); }catch(_){ return 'n/a'; } })();
+      return `pointerType=${ev.pointerType} id=${ev.pointerId}\n`
+        + `client=(${ev.clientX.toFixed(1)},${ev.clientY.toFixed(1)}) page=(${ev.pageX.toFixed(1)},${ev.pageY.toFixed(1)})\n`
+        + `vv: off=(${vv?vv.offsetLeft.toFixed(1):'n/a'},${vv?vv.offsetTop.toFixed(1):'n/a'}) `
+        + `size=(${vv?vv.width.toFixed(1):'n/a'}x${vv?vv.height.toFixed(1):'n/a'}) scale=${vv?vv.scale.toFixed(2):'n/a'}\n`
+        + `panel rect=(${w.getBoundingClientRect().left.toFixed(1)},${w.getBoundingClientRect().top.toFixed(1)}) `
+        + `pointerCapture held=${held}\n`
+        + `pageZoom active=${window.PZ?window.PZ.active:'n/a'}  NAV_ACTIVE=${window.NAV_ACTIVE}`;
+    };
+    peekLog = 'DOWN\n' + fields(e); pdbgUpdate();
     const mv = ev=>{
       const dx = ev.clientX - s.x, dy = ev.clientY - s.y;
+      peekLog = `MOVE dx=${dx.toFixed(1)} dy=${dy.toFixed(1)}\n` + fields(ev); pdbgUpdate();
       if(!dir){ clampBox(w, s.L + dx, s.T + dy, s.W, s.H); return; }
       let L = s.L, T = s.T, W = s.W, H = s.H;
       if(dir.includes('e')) W = Math.max(PEEK_MIN_W, s.W + dx);
@@ -855,8 +918,18 @@ function buildDock(){
       if(dir.includes('n')){ H = Math.max(PEEK_MIN_H, s.H - dy); T = s.T + (s.H - H); }
       clampBox(w, L, T, W, H);
     };
-    const up = ev=>{ w.classList.remove('dragging'); document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up); };
-    document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up);
+    const up = ev=>{
+      peekLog = `UP(${ev.type})\n` + fields(ev); pdbgUpdate();
+      w.classList.remove('dragging');
+      document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up);
+      document.removeEventListener('pointercancel', up); cap.removeEventListener('lostpointercapture', lost);
+    };
+    const lost = ev=>{
+      peekLog = `LOST CAPTURE (no up/cancel seen) — browser likely took the gesture\n` + fields(ev); pdbgUpdate();
+      up(ev);
+    };
+    document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up);
+    document.addEventListener('pointercancel', up); cap.addEventListener('lostpointercapture', lost);
   });
   document.addEventListener('click', e=>{ const b = e.target.closest && e.target.closest('.peek .pclose'); if(b) unfloat(b.closest('.peek')); });
   document.addEventListener('keydown', e=>{ if(e.key !== 'Escape') return;

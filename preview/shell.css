@@ -646,7 +646,15 @@ tspan.term{border-bottom:0; text-decoration:underline dotted; text-decoration-th
 .peek.float{position:fixed; z-index:60; display:flex; flex-direction:column; max-width:none; cursor:default; transition:none;
   box-shadow:0 22px 50px -14px rgba(0,0,0,.55); border-color:var(--accent-line, var(--line-2))}
 .peek.float .pclose{display:inline-block}
-.peek.float > header{cursor:grab; flex:none; user-select:none; padding-right:20px}
+/* touch-action:none here matches .rz and .canvaswrap/.splitter elsewhere in this file: any
+   element a custom JS drag must OWN the gesture for needs it, or the browser's native touch
+   scroll/pan recognizer can intermittently claim the same one-finger gesture mid-drag before
+   our own pointermove handler gets a say — the "moves in jerks, then stops" symptom. The
+   header never needs native scrolling of its own, so this is a pure win with no tradeoff.
+   .pbody is NOT changed here: it has real overflow:auto and must stay swipeable for touch
+   users to read long content, so disabling native touch scrolling there is a real tradeoff,
+   not a free fix — left for a deliberate decision rather than silently applied. */
+.peek.float > header{cursor:grab; flex:none; user-select:none; padding-right:20px; touch-action:none}
 .peek.float .pbody{flex:1 1 auto; min-height:0; max-height:none; overflow:auto; cursor:grab}
 .peek.float #tree{cursor:grab}
 .peek.float #peekTree #tree, .peek#peekTree.float #tree{width:100%; height:auto; max-height:none}
