@@ -1778,7 +1778,29 @@ if(window.visualViewport){
   const K_MIN = 1, K_MAX = 4;
   let k = 1, tx = 0, ty = 0, active = false;
 
-  function apply(){ pz.style.transform = active ? `scale(${k}) translate(${tx}px, ${ty}px)` : ''; }
+  /* TEMP DEBUG — remove before this goes anywhere near live. A visible readout of what
+     this engine is actually seeing, so "horizontal still doesn't work" can be told apart
+     from "the zoom gesture never reached this code at all" without guessing from a verbal
+     description. Shows live k/active plus a running count of each wheel-event shape seen,
+     so a pinch that never ticks the ctrl-wheel counter up points at a completely different
+     problem (the gesture isn't reaching the page as ctrl+wheel on this setup) than one that
+     does tick up (the engine is getting input; the bug is downstream of that). */
+  const dbg = document.createElement('div');
+  dbg.id = 'pzdebug';
+  dbg.style.cssText = 'position:fixed;top:4px;right:4px;z-index:99999;background:rgba(0,0,0,.75);'
+    + 'color:#fff;font:11px/1.5 monospace;padding:5px 8px;border-radius:4px;pointer-events:none;white-space:pre';
+  document.body.appendChild(dbg);
+  let ctrlTicks = 0, plainTicks = 0, lastWheel = 'none yet', lastDrag = 'none yet';
+  function dbgUpdate(){
+    dbg.textContent = `zoom ${k.toFixed(2)}x · ${active ? 'CONTROLLED' : 'native'}\n`
+      + `tx=${tx.toFixed(1)}  ty=${ty.toFixed(1)}\n`
+      + `window.scrollX=${window.scrollX}  scrollY=${window.scrollY}\n`
+      + `ctrl-wheel ticks: ${ctrlTicks}  plain-wheel ticks: ${plainTicks}\n`
+      + `last wheel: ${lastWheel}\n`
+      + `last drag: ${lastDrag}`;
+  }
+
+  function apply(){ pz.style.transform = active ? `scale(${k}) translate(${tx}px, ${ty}px)` : ''; dbgUpdate(); }
   function clampPan(){
     const vw = window.innerWidth, vh = window.innerHeight;
     const cw = wrap.scrollWidth, ch = wrap.scrollHeight;
@@ -1812,30 +1834,45 @@ if(window.visualViewport){
     if(active && k <= K_MIN) disengage();
   }
 
+  dbgUpdate();
+
   /* trackpad pinch / Ctrl+scroll: our zoom, not the browser's */
   window.addEventListener('wheel', e=>{
-    if(!e.ctrlKey) return;
-    if(e.target && e.target.closest && e.target.closest('.fwview')) return; /* the framework canvas owns its own pinch */
+    lastWheel = `ctrlKey=${e.ctrlKey} deltaX=${e.deltaX.toFixed(1)} deltaY=${e.deltaY.toFixed(1)} deltaMode=${e.deltaMode}`;
+    if(!e.ctrlKey){ dbgUpdate(); return; }
+    ctrlTicks++;
+    if(e.target && e.target.closest && e.target.closest('.fwview')){ dbgUpdate(); return; } /* the framework canvas owns its own pinch */
     e.preventDefault();
     zoomAt(k * (e.deltaY < 0 ? 1.08 : 1 / 1.08), e.clientX, e.clientY);
+    dbgUpdate();
   }, {passive:false});
 
   /* an ordinary two-finger scroll, once zoomed in, pans — #pagezoom is fixed/non-scrolling
      in that state, so without this the only way to move would be click-drag */
   window.addEventListener('wheel', e=>{
-    if(!active || e.ctrlKey) return;
-    if(e.target && e.target.closest && e.target.closest(SKIP)) return;
-    if(scrollAncestor(e.target, 'x') || scrollAncestor(e.target, 'y')) return; /* an inner panel's own scrollbar handles it */
+    if(e.ctrlKey) return;
+    plainTicks++;
+    if(!active){ dbgUpdate(); return; }
+    if(e.target && e.target.closest && e.target.closest(SKIP)){ dbgUpdate(); return; }
+    if(scrollAncestor(e.target, 'x') || scrollAncestor(e.target, 'y')){ dbgUpdate(); return; } /* an inner panel's own scrollbar handles it */
     e.preventDefault();
     tx -= e.deltaX / k; ty -= e.deltaY / k;
     clampPan(); apply();
+    dbgUpdate();
   }, {passive:false});
 
   /* click-drag empty space to pan */
   let pend = null;
   document.addEventListener('pointerdown', e=>{
-    if(e.button !== 0 || !pannable(e.target, e.clientX, e.clientY)) return;
+    if(e.button !== 0) return;
+    if(!pannable(e.target, e.clientX, e.clientY)){
+      lastDrag = `BLOCKED at (${e.clientX},${e.clientY}) target=${e.target.tagName}.${String(e.target.className||'').slice(0,30)}`;
+      dbgUpdate();
+      return;
+    }
     const xEl = scrollAncestor(e.target, 'x'), yEl = scrollAncestor(e.target, 'y');
+    lastDrag = `down (${e.clientX},${e.clientY}) target=${e.target.tagName} xEl=${xEl ? xEl.tagName + '.' + String(xEl.className||'').slice(0,20) : 'none'} yEl=${yEl ? yEl.tagName + '.' + String(yEl.className||'').slice(0,20) : 'none'} active=${active}`;
+    dbgUpdate();
     pend = {
       x:e.clientX, y:e.clientY, started:false, xEl, yEl,
       sl: xEl ? xEl.scrollLeft : window.scrollX,
@@ -1862,7 +1899,9 @@ if(window.visualViewport){
       const wx = pend.xEl ? window.scrollX : pend.sl - dx;
       const wy = pend.yEl ? window.scrollY : pend.st - dy;
       if(wx !== window.scrollX || wy !== window.scrollY) window.scrollTo(wx, wy);
+      dbgUpdate();
     }
+    lastDrag = `move dx=${dx} dy=${dy} xEl=${pend.xEl ? 'yes' : 'no'} yEl=${pend.yEl ? 'yes' : 'no'}`;
   });
   const end = ()=>{
     if(pend && pend.started) document.documentElement.classList.remove('panning');
