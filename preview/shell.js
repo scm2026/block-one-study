@@ -806,8 +806,37 @@ function buildDock(){
   dock.addEventListener('click', e=>{ const w = e.target.closest('.peek'); if(!w) return;
     if(e.target.closest('summary, a, button, .term, .fwnode')) return;          /* clicks on the content itself do their own thing */
     floatIt(w); });
-  /* pointer handling for a floating window: resize from a handle, move from a blank part */
-  const blank = (w, el)=> el === w || (el.closest('header') && !el.closest('button')) || el.classList.contains('pbody') || el === w.querySelector('svg#tree');
+  /* pointer handling for a floating window: resize from a handle, move from a blank part.
+
+     "blank" used to mean el.classList.contains('pbody') — true only for the body
+     container element ITSELF, or el === w.querySelector('svg#tree') — true only for the
+     svg element itself. Both are exact-element checks, not "is this point inside the
+     blank body area". A mouse, aimed with pixel precision at a visually empty gap, tends
+     to land exactly on one of those two elements by luck (there's often a real empty
+     margin around the content they wrap). A finger does not have that precision, and the
+     pbody/tree are usually FULL of real content — note text, list items, the framework
+     diagram's nodes and connecting lines — so the element actually under a fingertip,
+     even one aimed at what looks like blank space, is overwhelmingly likely to be some
+     descendant of pbody (a text node's wrapper, an SVG <g> or <path>) rather than pbody
+     or the svg element itself. That made the exact-match check fail silently on touch:
+     this handler would decline to start a drag (since blank() returned false), the
+     pointerdown would fall through un-prevented, and something else would pick it up
+     instead — the page-level pan handler, or the browser's own native touch
+     scroll/text-selection — which is exactly the reported symptom: the floating window
+     doesn't move, the page behind it does, and text starts highlighting.
+
+     Fixed to ask the right question: is this point inside the body area AT ALL, and not
+     on something that has its own, more specific meaning (a button, link, term, a
+     framework node meant to be tapped for its own tooltip)? That's a superset of the old
+     check — everything that used to count as blank still does — so this can only turn
+     previously-blocked drags into working ones, never the reverse. */
+  const PEEK_INTERACTIVE = 'button,a,input,textarea,select,[contenteditable="true"],label,.term,.fwnode,summary,.rz,.askit';
+  const blank = (w, el)=>{
+    if(el === w) return true;
+    if(el.closest('header')) return !el.closest('button');
+    if(el.closest('.pbody')) return !el.closest(PEEK_INTERACTIVE);
+    return false;
+  };
   document.addEventListener('pointerdown', e=>{
     const w = e.target.closest && e.target.closest('.peek.float'); if(!w) return;
     raise(w);
