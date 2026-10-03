@@ -2342,6 +2342,40 @@ if(window.visualViewport){
     if(active && k <= K_MIN) disengage();
   }
 
+  /* 2026-10: first-touch-pinch-after-refresh jitter fix. engage() (above) switches layout mode
+     synchronously (position:fixed etc.) but, since the rAF batching pass, the compensating
+     transform that makes that switch invisible is no longer written in the same tick -- it
+     lands on the next animation frame via requestPaint()/frameTick(). For a touch pinch, that
+     one-frame gap between "layout changed" and "transform corrected" is visible, but only on
+     the FIRST pinch after load: that's the only time a gesture crosses from !active to active.
+     A two-finger touch always has a pointerdown moment before any pointermove -- globalPinch()
+     (near the end of this file) calls preEngage() there, so the layout switch AND its
+     compensating transform both happen synchronously, before the gesture has moved at all and
+     while there is nothing on screen changing yet. By the time the first real pointermove
+     reaches zoomAt() above, active is already true, so its own `if(!active ...) engage()`
+     branch is simply skipped for touch -- that branch stays exactly as it was for the trackpad
+     ctrl-wheel path, which has no pointerdown-before-gesture moment to pre-engage at. */
+  function preEngage(){
+    if(active) return;
+    engage();
+    applyTransformNow();   /* k is still K_MIN (1) here, so this is a pure re-parenting: the
+       resulting scale(1) translate(-scrollX,-scrollY) looks pixel-identical to the normal
+       scrolled document it replaces -- nothing moves. Doing it synchronously, in the same
+       tick as engage()'s position switch, means there is no frame where the layout has
+       already changed but the compensating transform hasn't been written yet. */
+  }
+  /* Paired cleanup for a two-finger touch that lands (triggering preEngage() above) and lifts
+     without ever actually pinching -- a tap, or fingers that never moved apart/together enough
+     to change k. Without this, the page would be left stuck in the fixed-position/"active"
+     layout mode at k=1 indefinitely, never returning to normal document flow. Safe to call any
+     time: a no-op whenever a real zoom is in progress (k > K_MIN) or the page was never
+     engaged at all. */
+  function disengageIfAtRest(){
+    if(active && k <= K_MIN) disengage();
+  }
+  window.PZ_PRE_ENGAGE = preEngage;
+  window.PZ_DISENGAGE_IF_AT_REST = disengageIfAtRest;
+
   dbgUpdate();
 
   /* trackpad pinch / Ctrl+scroll: our zoom, not the browser's */
@@ -2545,6 +2579,10 @@ if(window.visualViewport){
          pageZoom's/buildDock's own document pointerdown listeners see this event at all). */
       if(window.DOCK_CANCEL_DRAG) window.DOCK_CANCEL_DRAG();
       if(window.PZ_CANCEL_PAN) window.PZ_CANCEL_PAN();
+      /* 2026-10: first-pinch jitter fix -- enter the active/fixed layout mode right here, at
+         the instant the pair completes and before either finger has moved, instead of letting
+         zoomAt() do it later mid-pointermove. See the preEngage() comment in pageZoom() above. */
+      if(window.PZ_PRE_ENGAGE) window.PZ_PRE_ENGAGE();
     }
     /* A third (or later) finger landing mid-pinch is tracked (so lifting it back off still
        correctly leaves a live 2-pointer pinch) but never participates in the distance/
@@ -2572,7 +2610,14 @@ if(window.visualViewport){
 
   const up = e=>{
     pts.delete(e.pointerId);
-    if(pts.size < 2) pinch = null;
+    if(pts.size < 2){
+      pinch = null;
+      /* A two-finger touch that landed (triggering PZ_PRE_ENGAGE above) and lifted without
+         ever becoming a real pinch -- e.g. a two-finger tap -- must not leave the page stuck
+         in the fixed-position/"active" layout mode. No-op if a real zoom is already in
+         progress. */
+      if(window.PZ_DISENGAGE_IF_AT_REST) window.PZ_DISENGAGE_IF_AT_REST();
+    }
   };
   document.addEventListener('pointerup', up, {capture:true});
   document.addEventListener('pointercancel', up, {capture:true});
