@@ -823,6 +823,7 @@ function buildDock(){
        coordinate-space conversion of any kind for that gesture any more -- the same reason
        they already needed none for the pre-existing trackpad pinch/zoom path. */
     w.style.left = L + 'px'; w.style.top = T + 'px'; w.style.width = W + 'px'; w.style.height = H + 'px';
+    return {L, T, W, H};
   };
   /* Keep floated windows inside the visible window as it pans/zooms — mirrors
      buildRailToggle's placeToggle exactly. Re-clamps each floated window's current box
@@ -903,6 +904,13 @@ function buildDock(){
   };
   const unfloat = w=>{
     if(!w.classList.contains('float')) return;
+    /* Diagnostic (see the drag-stop investigation, 2026-10): if unfloat() runs on a window
+       that's mid-drag, that's a termination path none of the pointerup/pointercancel/
+       lostpointercapture/pinch-cancel handlers below cover -- log it distinctly so it's
+       distinguishable from those if it's ever actually the cause. Known callers are the
+       dock's own pclose button, Escape, and the resize handler's narrow() branch; none of
+       those should fire mid-drag in practice, but this makes it visible instead of assumed. */
+    if(w.classList.contains('dragging')){ peekLog = 'UNFLOAT CALLED WHILE DRAGGING (external reset)\n' + (w.id || w.className); pdbgUpdate(); }
     w.querySelectorAll('.rz').forEach(h=>h.remove());
     w.classList.remove('float', 'pinned', 'open', 'dragging');
     ['left','top','width','height','zIndex','transition'].forEach(k=>w.style[k] = '');
@@ -962,7 +970,17 @@ function buildDock(){
     + 'white-space:pre;transform:translateY(192px)';
   document.body.appendChild(pdbg);
   let peekLog = 'no drag yet';
-  function pdbgUpdate(){ pdbg.textContent = peekLog; }
+  /* Diagnostic (2026-10, iPad Pro "drag stops randomly" investigation): a single overwritten
+     line only shows the LAST thing that happened, which is useless if the terminating event
+     itself doesn't clearly say why (e.g. a plain UP(pointercancel) with no other context). Keep
+     a short rolling trail instead, so the sequence leading up to a stop -- not just its final
+     frame -- is visible on the device when it happens. */
+  let dbgTrail = [];
+  function pdbgUpdate(){
+    dbgTrail.push(peekLog);
+    if(dbgTrail.length > 7) dbgTrail.shift();
+    pdbg.textContent = dbgTrail.join('\n----\n');
+  }
   pdbgUpdate();
   /* Minimum pointer movement, in CSS px, before a pointerdown-then-move counts as a real drag
      rather than a tap. Section 2i (v10) found that a plain tap on a partially-visible floated
@@ -1033,6 +1051,7 @@ function buildDock(){
        re-arming mid-drag if the pointer happens to pause and the next tick's dx/dy momentarily
        looks small again. */
     let dragStarted = false;
+    let wasPinned = false;
     const mv = ev=>{
       /* pointerId filter -- this listener is document-level, so without this it reacts to
          ANY pointer's movement, not just the one that started this drag. Harmless with a
@@ -1053,7 +1072,21 @@ function buildDock(){
         dragStarted = true;
       }
       peekLog = `MOVE dx=${dx.toFixed(1)} dy=${dy.toFixed(1)}\n` + fields(ev); pdbgUpdate();
-      if(!dir){ clampBox(w, s.L + dx, s.T + dy, s.W, s.H); return; }
+      let applied;
+      if(!dir){
+        applied = clampBox(w, s.L + dx, s.T + dy, s.W, s.H);
+        /* Diagnostic (2026-10, iPad Pro "drag stops randomly" investigation): clampBox() keeps
+           PEEK_KEEP px of the window always on-screen -- so dragging toward an edge hard enough
+           can pin L/T at that boundary while the finger keeps moving. The window then visually
+           stops even though this handler is still live and still receiving events -- which would
+           look identical to the gesture actually being cancelled, but isn't. Log only the
+           transition into/out of pinned, not every frame while held there, to avoid flooding the
+           trail. */
+        const pinnedNow = Math.abs(applied.L - (s.L + dx)) > 0.5 || Math.abs(applied.T - (s.T + dy)) > 0.5;
+        if(pinnedNow && !wasPinned){ peekLog = `PINNED AT VIEWPORT EDGE (clampBox limiting, not a cancel) wanted=(${(s.L+dx).toFixed(1)},${(s.T+dy).toFixed(1)}) applied=(${applied.L.toFixed(1)},${applied.T.toFixed(1)})`; pdbgUpdate(); }
+        wasPinned = pinnedNow;
+        return;
+      }
       let L = s.L, T = s.T, W = s.W, H = s.H;
       if(dir.includes('e')) W = Math.max(PEEK_MIN_W, s.W + dx);
       if(dir.includes('s')) H = Math.max(PEEK_MIN_H, s.H + dy);
@@ -1105,6 +1138,12 @@ function buildDock(){
      zoom transform doesn't change innerWidth/innerHeight -- so there is no longer a
      competing gesture for this handler to defer to, and the guard is gone with it. */
   window.addEventListener('resize', ()=>{
+    /* Diagnostic (2026-10, iPad Pro "drag stops randomly" investigation): a resize event firing
+       mid-drag (iOS Safari fires these on dynamic-toolbar show/hide, which a drag gesture can
+       trigger) re-clamps every floated window to its OWN current getBoundingClientRect() -- a
+       no-op for position, but logged here so it's visible on the trail whether one coincides
+       with a reported stop, rather than assumed absent. */
+    if(activeDrag){ peekLog = 'RESIZE EVENT WHILE A DRAG/RESIZE WAS ACTIVE (vv/toolbar change mid-gesture?)'; pdbgUpdate(); }
     document.querySelectorAll('.peek.float').forEach(w=>{ if(narrow()) unfloat(w); else { const r = w.getBoundingClientRect(); clampBox(w, r.left, r.top, r.width, r.height); } });
   });
 }

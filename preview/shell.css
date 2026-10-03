@@ -729,9 +729,26 @@ tspan.term{border-bottom:0; text-decoration:underline dotted; text-decoration-th
    this to get the normal docked/floating treatment instead of this static-card fallback).
    This pair must stay in sync with narrow() in shell.js; do not change one without the other.
    Separate from, and not to be confused with, the 1099/1100px pair elsewhere in this file that
-   governs the step-rail-vs-sticky-bar layout -- a different feature, left untouched. */
+   governs the step-rail-vs-sticky-bar layout -- a different feature, left untouched.
+
+   2026-10 layering fix: this was `position:static`, which drops #dock out of the stacking
+   order entirely -- z-index has NO effect on a statically-positioned element (CSS2.1 9.9.1).
+   That was invisible as long as nothing else on the page ever formed its own stacking context,
+   but the touch-pinch rebuild's zoom engine applies `transform` to #pzlayer the instant zoom
+   goes active (see apply() in shell.js), and `transform` always creates a stacking context of
+   its own (treated as z-index:0), regardless of position. With #dock static, that context has
+   no competing z-index to lose to and paints on top of the static dock content -- the reported
+   "stacked popups appear behind the main screen / tree shows embossed through it" bug. Fixing
+   this needs #dock to be a STACKING-CONTEXT-FORMING element again so its pre-existing z-index:45
+   (set in the base, non-media #dock rule above and left untouched by this override) can actually
+   take effect and beat #pzlayer's z-index:0. `position:relative` is the minimal way to do that:
+   with no top/left/etc offset, it is 100% layout-identical to `position:static` (the stacked,
+   margined, stretch-aligned card list this breakpoint wants), it just stops being invisible to
+   z-index. No descendant inside #dock relies on an absolute-positioned ancestor here (.rz only
+   exists on .peek.float, which this breakpoint's narrow() unfloats before this layout ever
+   applies), so this has no other layout side effects. */
 @media(max-width:1023px){
-  #dock{position:static; transform:none; margin:16px; max-height:none; align-items:stretch}
+  #dock{position:relative; transform:none; margin:16px; max-height:none; align-items:stretch}
   .peek, .peek.open{width:auto} .peek .pbody, .peek.open .pbody{max-height:none; overflow:visible; padding:4px 12px 12px}
   .peek .pclose{display:none !important}
   .peek:not(.open) #factcard{display:block} .peek:not(.open) #treecap{display:block}
