@@ -801,14 +801,50 @@ function buildDock(){
      with no drag in progress — mirrors buildRailToggle's placeToggle exactly. Re-clamps
      each floated window's current box against the (possibly now-smaller/shifted) visible
      window; clampBox only ever constrains, never recenters, so a window already fully
-     visible is left untouched. */
+     visible is left untouched.
+
+     SETTLE, DON'T CHASE THE GESTURE: the first version of this called reclampAll() on every
+     single 'resize'/'scroll' tick visualViewport fires — which is dozens of times over the
+     course of one native pinch-zoom. Two things make that actively harmful rather than just
+     wasteful: (1) .peek.float is position:fixed, and a fixed element's relationship to the
+     VISUAL (zoomed) viewport vs. the LAYOUT viewport is a long-standing cross-engine rough
+     edge — getBoundingClientRect() read on a fixed element mid-gesture can return a
+     transitional value that doesn't yet match where the browser is about to settle it; (2)
+     clampBox() writes that read straight back as the window's new left/top/width/height,
+     so a transiently-skewed read gets baked in as real state, which the NEXT tick then reads
+     back and skews further — a feedback loop. That compounding mid-gesture read/write cycle
+     is what real-device testing reported as floating windows "flying off" or "bouncing"
+     during a main-screen pinch-zoom. The fix is to stop reading/writing until the gesture is
+     actually over, then settle once against the final, stable visualViewport state.
+
+     "Over" is detected two ways, raced against each other rather than one replacing the
+     other, so this never depends solely on either:
+       - EVENT-DRIVEN (preferred): the standalone 'scrollend' event, fired on document/window
+         (not on visualViewport itself — no such API exists). Chrome/Edge fire this for
+         visual-viewport panning (the scroll component of a pinch-zoom), and recent Safari
+         versions have added support too. Where it fires, it's immediate and precise: it
+         means the platform itself is telling us the gesture's scroll motion has finished.
+       - DEBOUNCE FALLBACK (always running regardless): a short timer that (re)starts on every
+         visualViewport 'resize'/'scroll' tick and fires reclampAll() once ~150ms pass with no
+         further ticks. This is the safety net for two cases 'scrollend' doesn't reliably
+         cover: browsers that don't support it at all, and a pinch that changes SCALE
+         (visualViewport 'resize') without panning the offset enough to be treated as a
+         document scroll. Whichever of the two fires first wins; the other is simply a no-op
+         once reclampAll() has already run (the debounce is cleared by the scrollend handler,
+         and a stray extra reclampAll() after it is harmless since clampBox is idempotent on
+         an already-valid box). */
   if(window.visualViewport){
-    window.visualViewport.addEventListener('resize', ()=>{
+    const FLOAT_SETTLE_DEBOUNCE = 150;
+    let settleTimer = null;
+    const reclampAll = ()=>{
       document.querySelectorAll('.peek.float').forEach(w=>{ const r = w.getBoundingClientRect(); clampBox(w, r.left, r.top, r.width, r.height); });
-    });
-    window.visualViewport.addEventListener('scroll', ()=>{
-      document.querySelectorAll('.peek.float').forEach(w=>{ const r = w.getBoundingClientRect(); clampBox(w, r.left, r.top, r.width, r.height); });
-    });
+    };
+    const scheduleSettle = ()=>{ clearTimeout(settleTimer); settleTimer = setTimeout(reclampAll, FLOAT_SETTLE_DEBOUNCE); };
+    window.visualViewport.addEventListener('resize', scheduleSettle);
+    window.visualViewport.addEventListener('scroll', scheduleSettle);
+    if('onscrollend' in window){
+      document.addEventListener('scrollend', ()=>{ clearTimeout(settleTimer); reclampAll(); });
+    }
   }
   let zTop = 60; const raise = w=>{ w.style.zIndex = ++zTop; };
   const DIRS = ['n','s','e','w','ne','nw','se','sw'];
