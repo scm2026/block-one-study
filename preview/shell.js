@@ -812,283 +812,51 @@ function buildDock(){
     /* L/T above are LAYOUT-viewport-relative ("screen") coordinates -- the same frame as
        getBoundingClientRect()/clientX,Y, which is what every caller passes in and what
        vvBounds() clamps against. That's the correct frame to write directly into
-       style.left/top for a position:fixed window (every other caller of clampBox only ever
-       runs while a window is fixed). A window currently in pinch mode (position:absolute,
-       flagged by data-pinchAbs -- see toPinchMode()) needs DOCUMENT-relative coordinates
-       instead -- the exact same conversion toPinchMode() itself uses at gesture start,
-       applied here too since v10's "disable dragging entirely during pinch" fix is being
-       replaced with "convert the coordinates correctly instead" (Section 2m/4.15): a live
-       drag on a partially-visible window during an active pinch needs its delta written in
-       document-relative terms, or it lands roughly as far off as the page is currently
-       panned -- the same math error v10's blanket guard sidestepped by disabling dragging
-       altogether, which also broke legitimate dragging while zoomed in. */
-    if(w.dataset.pinchAbs){
-      const vv = window.visualViewport;
-      L += vv ? (vv.pageLeft - vv.offsetLeft) : window.scrollX;
-      T += vv ? (vv.pageTop  - vv.offsetTop)  : window.scrollY;
-    }
+       style.left/top for a position:fixed window -- which, as of the touch-pinch rebuild
+       (Section 2n/4.16, see the project doc), is now EVERY window, ALWAYS: the previous
+       position:fixed<->position:absolute pinch-mode swap (data-pinchAbs, toPinchMode()/
+       fromPinchMode()) existed only to cope with native browser touch pinch-zoom, which no
+       longer reaches floating windows at all now that two-finger touch is captured and
+       driven entirely by this app's own code (see globalPinch() near the end of this file).
+       Floating windows are position:fixed children of document.body, structurally outside
+       #pzlayer (the only element the new pinch/zoom transform ever touches), so they need no
+       coordinate-space conversion of any kind for that gesture any more -- the same reason
+       they already needed none for the pre-existing trackpad pinch/zoom path. */
     w.style.left = L + 'px'; w.style.top = T + 'px'; w.style.width = W + 'px'; w.style.height = H + 'px';
   };
-  /* Keep floated windows inside the visible window as it pans during a pinch-zoom, even
-     with no drag in progress — mirrors buildRailToggle's placeToggle exactly. Re-clamps
-     each floated window's current box against the (possibly now-smaller/shifted) visible
-     window; clampBox only ever constrains, never recenters, so a window already fully
-     visible is left untouched.
+  /* Keep floated windows inside the visible window as it pans/zooms — mirrors
+     buildRailToggle's placeToggle exactly. Re-clamps each floated window's current box
+     against the (possibly now-smaller/shifted) visible window; clampBox only ever
+     constrains, never recenters, so a window already fully visible is left untouched.
 
-     SETTLE, DON'T CHASE THE GESTURE: the first version of this called reclampAll() on every
-     single 'resize'/'scroll' tick visualViewport fires — which is dozens of times over the
-     course of one native pinch-zoom. Two things make that actively harmful rather than just
-     wasteful: (1) .peek.float is position:fixed, and a fixed element's relationship to the
-     VISUAL (zoomed) viewport vs. the LAYOUT viewport is a long-standing cross-engine rough
-     edge — getBoundingClientRect() read on a fixed element mid-gesture can return a
-     transitional value that doesn't yet match where the browser is about to settle it; (2)
-     clampBox() writes that read straight back as the window's new left/top/width/height,
-     so a transiently-skewed read gets baked in as real state, which the NEXT tick then reads
-     back and skews further — a feedback loop. That compounding mid-gesture read/write cycle
-     is what real-device testing reported as floating windows "flying off" or "bouncing"
-     during a main-screen pinch-zoom. The fix is to stop reading/writing until the gesture is
-     actually over, then settle once against the final, stable visualViewport state.
+     REMOVED, Section 2n/4.16 (full touch-pinch rebuild — see the project doc for the prior
+     history this replaces): this used to also carry an entire position:fixed<->
+     position:absolute pinch-mode swap (toPinchMode()/fromPinchMode()), a symmetric
+     scale-based settle gate (SETTLE_SCALE_TOLERANCE/atZoomBaseline/reclampAll/maybeSettle/
+     scheduleSettle), a scrollend/debounce race to detect "gesture over", a blur/
+     visibilitychange safety net (forceSettle), and a dedicated #pinchdebug overlay — all of
+     it triggered by raw document-level touchstart/touchmove/touchend/touchcancel listeners
+     reacting to the BROWSER'S OWN native two-finger pinch-zoom, which is what used to reach
+     this page at all on touch. None of that exists any more because native touch pinch-zoom
+     no longer reaches this page: two-finger touch is now captured and driven entirely by
+     this app's own code (globalPinch(), near the end of this file), using the exact same
+     pageZoom() state/transform already used by the trackpad ctrlKey-wheel path. Floating
+     windows are position:fixed children of document.body, outside #pzlayer (the only
+     element that transform ever touches), so — exactly as already true for trackpad zoom —
+     they need no position-mode swap, no coordinate conversion, and no settle logic for this
+     gesture at all: clampBox() below is the only reclamp this now needs, used the same way
+     plain window resize already used it.
 
-     "Over" is detected two ways, raced against each other rather than one replacing the
-     other, so this never depends solely on either:
-       - EVENT-DRIVEN (preferred): the standalone 'scrollend' event, fired on document/window
-         (not on visualViewport itself — no such API exists). Chrome/Edge fire this for
-         visual-viewport panning (the scroll component of a pinch-zoom), and recent Safari
-         versions have added support too. Where it fires, it's immediate and precise: it
-         means the platform itself is telling us the gesture's scroll motion has finished.
-       - DEBOUNCE FALLBACK (always running regardless): a short timer that (re)starts on every
-         visualViewport 'resize'/'scroll' tick and fires reclampAll() once ~150ms pass with no
-         further ticks. This is the safety net for two cases 'scrollend' doesn't reliably
-         cover: browsers that don't support it at all, and a pinch that changes SCALE
-         (visualViewport 'resize') without panning the offset enough to be treated as a
-         document scroll. Whichever of the two fires first wins; the other is simply a no-op
-         once reclampAll() has already run (the debounce is cleared by the scrollend handler,
-         and a stray extra reclampAll() after it is harmless since clampBox is idempotent on
-         an already-valid box).
-
-     REVISED after real-device re-test: the debounce/scrollend settle above reduced the bounce
-     but didn't eliminate it. The gap: a real two-finger pinch is rarely one smooth continuous
-     motion — people pause mid-gesture (readjust grip, check the result, change direction)
-     without lifting their fingers. Any such pause longer than FLOAT_SETTLE_DEBOUNCE was being
-     read as "the gesture is over," so reclampAll() fired — and measured a still-live,
-     still-mid-pinch position — WHILE the fingers were still down and the gesture continued
-     right after. That's a real settle firing too early, not a bug in the settle logic itself.
-
-     The fix is a harder gate on top of the existing one: track how many touches are actually
-     on the glass (document-level touchstart/touchend/touchcancel, which is the one unambiguous
-     signal that a pinch is still physically in progress, independent of event timing). While
-     any touch is active, scheduleSettle() is a no-op outright — no timer is even started, so a
-     mid-gesture pause of any length can no longer trigger a premature reclamp. The moment the
-     last finger lifts (touchend/touchcancel bringing the count to 0), settling proceeds exactly
-     as before (scrollend if it fires, the debounce otherwise). This doesn't change anything for
-     non-touch input (trackpad/mouse never touch this gate — activeTouches stays 0 for them, so
-     scheduleSettle behaves exactly as it did before this revision). */
-  /* PLATFORM CONSTRAINT, not a logic bug: a minimal, JS-free reproduction (one position:fixed
-     box, nothing else on the page) jitters identically to these real floating windows during an
-     active native two-finger pinch on iPad/WebKit, specifically around the zoom-out rubber-band
-     limit; the same box as position:absolute does not. This was confirmed by disabling every
-     line of this file's own geometry writes (including the settle logic right below) and still
-     seeing the real window jitter exactly like the bare repro — so no amount of re-clamping,
-     debouncing, or touch-gating here was ever going to fix it, because the browser's own live
-     compositing of a fixed element through the pinch transform is the thing moving it, not this
-     code. The mitigation: stay position:fixed for all ordinary use (so scroll-following behavior
-     is unchanged), and temporarily become position:absolute for the duration of a native pinch
-     only, switching back once it settles. See toPinchMode/fromPinchMode below. */
-  /* TEMP DEBUG, preview only — added specifically to answer one question: is toPinchMode()
-     actually running during a real on-device pinch at all? None of the other three debug
-     overlays (#pzdebug, #navdebug, #peekdebug) touch pinch state -- they only update on wheel
-     zoom or an active window drag -- so a background two-finger pinch with no window drag
-     involved leaves all three looking completely static whether or not this code ran. That
-     made an earlier device report ambiguous. This one is unambiguous: live touch count,
-     whether pinch mode is currently engaged, and the actual position/left/top of every floated
-     window, refreshed on every relevant event. Remove before anything goes near live, same as
-     the other three. */
-  const pinchDbg = document.createElement('div');
-  pinchDbg.id = 'pinchdebug';
-  /* Deliberately placed in the OPPOSITE corner from the other three stacked overlays, not
-     stacked below them: #peekdebug in particular grows taller than its allotted gap during an
-     active drag (it logs a growing multi-line pointer trace), so a fourth box stacked beneath
-     it by a fixed offset gets silently covered whenever a drag is in progress -- exactly what
-     was reported. Top-left has nothing else on it. */
-  pinchDbg.style.cssText = 'position:fixed;top:4px;left:4px;z-index:99999;background:rgba(0,0,0,.75);'
-    + 'color:#0f0;font:11px/1.5 monospace;padding:5px 8px;border-radius:4px;pointer-events:none;'
-    + 'white-space:pre';
-  document.body.appendChild(pinchDbg);
-  function pinchDbgUpdate(touchCount){
-    const vv = window.visualViewport;
-    const scaleStr = vv ? vv.scale.toFixed(3) : 'n/a';
-    const wins = Array.from(document.querySelectorAll('.peek.float')).map((w,i)=>{
-      const s = getComputedStyle(w);
-      return `  win${i}: pos=${s.position} L=${Math.round(parseFloat(s.left))} T=${Math.round(parseFloat(s.top))}`
-        + (w.classList.contains('dragging') ? ' DRAGGING' : '');
-    }).join('\n');
-    pinchDbg.textContent = `touches=${touchCount} pinchActive=${pinchActive} scale=${scaleStr}\n${wins || '  (no floated windows)'}`;
-  }
-  let pinchActive = false;
-  /* GESTURE-OWNERSHIP PRECEDENCE, added for Section 2m/4.15: a native multi-touch pinch must
-     always win over a single-finger window drag that happened to start first. The dock's
-     pointerdown handler (below) sets the 'dragging' class on a window the instant a finger
-     touches its blank space -- before any movement, let alone a second finger -- and
-     toPinchMode() (above) deliberately skips any window still carrying 'dragging', on the
-     theory that a window mid-drag shouldn't have its geometry swapped out from under the
-     user (Section 2f). That protection backfires when the "drag" was never more than a
-     first finger landing right as a second one arrives to start a real pinch: the window
-     gets stuck excluded from pinch-mode and stays position:fixed for the whole gesture,
-     reproducing the WebKit fixed-during-live-pinch jitter (Section 2f/4.9) for exactly that
-     window. activeDrag holds a cancel callback for whatever single-pointer drag/resize is
-     currently provisional (set by the pointerdown handler below, cleared on its own
-     pointerup/pointercancel); the touchstart listener calls it the instant a second finger
-     is detected, BEFORE toPinchMode() runs, so the window is never still 'dragging' by the
-     time toPinchMode() decides whether to skip it. */
+     GESTURE-OWNERSHIP PRECEDENCE still applies, just with a different trigger: a two-finger
+     pinch must still win over a single-finger window drag that happened to grab a window
+     first (the dock's pointerdown handler below sets 'dragging' the instant a finger touches
+     a window's blank space, before any movement). activeDrag/cancelActiveDrag below still
+     provide that cancel path; the caller is now globalPinch(), at the capture-phase instant
+     its second touch pointer arrives, exposed as window.DOCK_CANCEL_DRAG so it can call this
+     without this file needing to know anything about that handler's internals. */
   let activeDrag = null;
   const cancelActiveDrag = ()=>{ if(activeDrag){ const c = activeDrag; activeDrag = null; c(); } };
-  /* Hoisted out of the `if(window.visualViewport){...}` block below (which still owns all the
-     settle logic that reads/writes it) so the pointerdown handler further down -- outside that
-     block -- can read the live touch count too, to tell "a real multi-touch pinch is physically
-     in progress right now" apart from "pinchActive is true", which can stay true long after
-     fingers lift (any time the page is still zoomed away from baseline -- see atZoomBaseline).
-     Dragging must be allowed in the latter case (that's the whole point of Section 2m/4.15) and
-     refused only in the former. */
-  let activeTouches = 0;
-  pinchDbgUpdate(0);
-  const toPinchMode = ()=>{
-    if(pinchActive) return;
-    pinchActive = true;
-    const vv = window.visualViewport;
-    document.querySelectorAll('.peek.float').forEach(w=>{
-      if(w.classList.contains('dragging')) return;   /* never touch geometry on a window mid-drag */
-      const r = w.getBoundingClientRect();
-      /* getBoundingClientRect() is LAYOUT-viewport-relative (the same space as pointer
-         clientX/Y) and is unaffected by the live pinch transform, which only moves the VISUAL
-         viewport. position:absolute needs DOCUMENT-relative coordinates, so the layout
-         viewport's own distance from the document origin has to be added to it. That distance
-         is deliberately sourced from the VisualViewport API rather than window.scrollX/scrollY:
-         vv.pageLeft is the visual viewport's distance from the document origin, vv.offsetLeft is
-         the visual viewport's distance from the layout viewport's origin, so (pageLeft -
-         offsetLeft) is exactly the layout viewport's own distance from the document origin — the
-         quantity window.scrollX nominally represents, but read from the one API actually
-         specified to stay correct through an active native zoom/pan, rather than leaning on
-         scroll-position reporting during the single gesture most likely to stress it.
-           documentLeft = clientRect.left + (vv.pageLeft - vv.offsetLeft)
-           documentTop  = clientRect.top  + (vv.pageTop  - vv.offsetTop)
-         Written once, here, at gesture start — never again until fromPinchMode() at settle. */
-      const docL = r.left + (vv ? (vv.pageLeft - vv.offsetLeft) : window.scrollX);
-      const docT = r.top  + (vv ? (vv.pageTop  - vv.offsetTop)  : window.scrollY);
-      w.dataset.pinchAbs = '1';
-      w.style.position = 'absolute';
-      w.style.left = docL + 'px';
-      w.style.top = docT + 'px';
-    });
-  };
-  const fromPinchMode = ()=>{
-    if(!pinchActive) return;
-    pinchActive = false;
-    document.querySelectorAll('.peek.float[data-pinch-abs]').forEach(w=>{
-      delete w.dataset.pinchAbs;
-      /* getBoundingClientRect() always reflects the element's actual on-screen, layout-viewport-
-         relative position regardless of which position mode produced it — so reading it here
-         (now that the gesture has settled and the page has stopped moving) and writing it
-         straight back as position:fixed left/top needs no conversion, unlike the swap above. */
-      const r = w.getBoundingClientRect();
-      w.style.position = 'fixed';
-      clampBox(w, r.left, r.top, r.width, r.height);
-    });
-  };
-  if(window.visualViewport){
-    const FLOAT_SETTLE_DEBOUNCE = 150;
-    /* Tolerance for "back at native-zoom baseline". visualViewport.scale is never exactly 1.000
-       at rest on every device/browser combo (sub-pixel/float noise), so treat anything within
-       this band of 1 as settled rather than requiring an exact match.
-       SYMMETRIC, not one-sided: a zoom-OUT past the floor produces a native rubber-band/elastic
-       overshoot where scale briefly dips BELOW 1 before the browser animates it back up -- a real
-       device report showed the windows jumping every time during that snap-back. The original
-       one-sided check (scale > baseline + tolerance) only ever caught the zoom-IN case and let a
-       fingers-lifted-mid-undershoot moment read as "close enough to baseline," switching back to
-       position:fixed while that snap-back animation was still live and re-exposing the exact
-       WebKit fixed-during-live-zoom desync (Section 2f/4.9) for its remaining duration. Measuring
-       the deviation with Math.abs() catches both directions with the same one tolerance. */
-    const SETTLE_SCALE_TOLERANCE = 0.02;
-    const atZoomBaseline = vv => !vv || Math.abs(vv.scale - 1) <= SETTLE_SCALE_TOLERANCE;
-    let settleTimer = null;
-    const reclampAll = ()=>{
-      fromPinchMode();
-      document.querySelectorAll('.peek.float').forEach(w=>{ const r = w.getBoundingClientRect(); clampBox(w, r.left, r.top, r.width, r.height); });
-    };
-    /* GESTURE ENDING (fingers lifted) IS NOT THE SAME EVENT AS THE PAGE RETURNING TO AN UNZOOMED
-       BASELINE. The original version of this settle path treated activeTouches hitting 0 as the
-       single signal that it was safe to switch floated windows back to position:fixed. That's
-       correct after a zoom-OUT, which tends to end back near scale 1 (the rubber-band floor
-       pulls it there) -- but after a zoom-IN, lifting your fingers leaves the page zoomed in,
-       not at baseline. Switching back to position:fixed at that point immediately re-exposes the
-       exact desync Section 2f/4.9 exists to avoid (a position:fixed element is pinned to the
-       un-zoomed layout viewport while the browser is still actively rendering a zoomed, panned
-       visual viewport) -- reported as floated windows jumping to the wrong place the instant
-       fingers lift, worse the further the page had been panned from the zoom's anchor point.
-       Fix: gate the actual position:fixed restoration on BOTH activeTouches===0 AND
-       visualViewport.scale being back within SETTLE_SCALE_EPS of 1. If touches hit zero while
-       scale is still elevated, do NOTHING -- the window's document-relative left/top, written
-       once at gesture start by toPinchMode(), is already correct and needs no further write (see
-       "zero geometry writes in between" in Section 2f) -- and rely on the existing
-       visualViewport 'resize'/'scroll' listeners (which already call scheduleSettle() on every
-       tick) to re-invoke this check once scale has actually come back down, with no separate
-       polling loop needed. */
-    const maybeSettle = ()=>{
-      if(activeTouches > 0) return;   /* a finger is still on the glass -- the gesture isn't over, don't settle yet */
-      const vv = window.visualViewport;
-      if(pinchActive && !atZoomBaseline(vv)){
-        pinchDbgUpdate(activeTouches);   /* reflect the "waiting for baseline" state in the overlay, but write nothing to the windows */
-        return;
-      }
-      reclampAll();
-    };
-    const scheduleSettle = ()=>{
-      clearTimeout(settleTimer);
-      if(activeTouches > 0) return;   /* a finger is still on the glass -- the gesture isn't over, don't settle yet */
-      settleTimer = setTimeout(maybeSettle, FLOAT_SETTLE_DEBOUNCE);
-    };
-    document.addEventListener('touchstart', e=>{
-      activeTouches = e.touches.length;
-      clearTimeout(settleTimer);
-      if(activeTouches >= 2){
-        cancelActiveDrag();   /* release any provisional one-finger drag FIRST, so toPinchMode() below never sees a stale 'dragging' class and skips this window -- see the activeDrag comment above */
-        toPinchMode();   /* two fingers down is the one unambiguous "native pinch may be starting" signal */
-      }
-      pinchDbgUpdate(activeTouches);
-    }, {passive:true});
-    document.addEventListener('touchmove', e=>{ pinchDbgUpdate(e.touches.length); }, {passive:true});
-    document.addEventListener('touchend', e=>{ activeTouches = e.touches.length; if(activeTouches === 0) scheduleSettle(); pinchDbgUpdate(activeTouches); }, {passive:true});
-    document.addEventListener('touchcancel', e=>{ activeTouches = e.touches.length; if(activeTouches === 0) scheduleSettle(); pinchDbgUpdate(activeTouches); }, {passive:true});
-    window.visualViewport.addEventListener('resize', scheduleSettle);
-    window.visualViewport.addEventListener('scroll', scheduleSettle);
-    if('onscrollend' in window){
-      document.addEventListener('scrollend', ()=>{ if(activeTouches === 0){ clearTimeout(settleTimer); maybeSettle(); pinchDbgUpdate(activeTouches); } });
-    }
-    /* SAFETY NET for a gesture interrupted in a way that never delivers touchend/touchcancel at
-       all -- e.g. the OS swaps away from the browser, a system sheet/permission prompt steals
-       focus, or the tab is backgrounded, all mid-pinch. Nothing above fires in that case, so
-       activeTouches could get stuck > 0 forever and a window would be stranded in
-       position:absolute pinch mode indefinitely. On regaining focus/visibility, there is no way
-       to know the real touch count OR the real zoom state, so treat it as "gesture over"
-       unconditionally and bypass the scale gate above on purpose: getting the window back to a
-       recoverable, interactive state takes priority over a smooth transition here. This can
-       still produce one visible jump if focus/visibility is lost while genuinely still zoomed
-       in -- a known, accepted gap (see the project doc) -- so log it distinctly from a normal
-       settle when that's what happened, to keep this rare recovery path distinguishable from
-       everyday behavior if it ever needs debugging. */
-    const forceSettle = ()=>{
-      activeTouches = 0;
-      clearTimeout(settleTimer);
-      const vv = window.visualViewport;
-      if(pinchActive && !atZoomBaseline(vv)){
-        console.warn('[pinchmode] forceSettle (blur/visibilitychange) restoring position:fixed while visualViewport.scale is still '
-          + vv.scale.toFixed(3) + ' -- rare interrupted-gesture recovery path, not a normal settle. A visible jump may occur.');
-      }
-      reclampAll();
-      pinchDbgUpdate(0);
-    };
-    window.addEventListener('blur', forceSettle);
-    document.addEventListener('visibilitychange', ()=>{ if(document.hidden) forceSettle(); });
-  }
+  window.DOCK_CANCEL_DRAG = cancelActiveDrag;
   let zTop = 60; const raise = w=>{ w.style.zIndex = ++zTop; };
   const DIRS = ['n','s','e','w','ne','nw','se','sw'];
   const floatIt = w=>{
@@ -1212,14 +980,12 @@ function buildDock(){
      still writes nothing at all rather than relying solely on the coordinate math being right. */
   const DRAG_MOVE_THRESHOLD = 4;
   document.addEventListener('pointerdown', e=>{
-    /* A real multi-touch pinch must always win over a single-finger drag that happened to grab
-       a window first -- see the activeDrag/cancelActiveDrag comment near pinchActive above.
-       Note this is NOT `if(pinchActive) return` (that was v10's blanket guard, removed here):
-       pinchActive stays true for as long as the page is genuinely zoomed away from baseline,
-       including long after fingers lift, and dragging a partially-visible window during that
-       window is exactly the behavior this fix restores. activeTouches is the narrower, correct
-       signal -- "a pinch is physically happening on the glass right now". */
-    if(activeTouches >= 2) return;
+    /* A real two-finger pinch must always win over a single-finger drag that happened to grab
+       a window first -- see the activeDrag/cancelActiveDrag comment above. window.PZ_PINCHING
+       is globalPinch()'s own live touch-pointer count (near the end of this file); this is a
+       second line of defense alongside globalPinch()'s capture-phase cancelActiveDrag() call,
+       for a pointerdown that arrives fractionally after the second finger was already down. */
+    if(window.PZ_PINCHING && window.PZ_PINCHING()) return;
     if(activeDrag) return;   /* a drag/resize is already provisional from another pointer; don't start a second, overlapping one */
     let w = e.target.closest && e.target.closest('.peek.float');
     if(!w){
@@ -1268,6 +1034,16 @@ function buildDock(){
        looks small again. */
     let dragStarted = false;
     const mv = ev=>{
+      /* pointerId filter -- this listener is document-level, so without this it reacts to
+         ANY pointer's movement, not just the one that started this drag. Harmless with a
+         single pointer down, but a real second touch arriving mid-drag (e.g. one finger
+         already dragging a window when a second lands elsewhere to start a pinch) would
+         otherwise feed that second pointer's coordinates into THIS gesture's dx/dy math --
+         a likely contributor to reported flicker/jumps when a pinch starts with a finger
+         already on a window. setPointerCapture above only retargets where this pointer's
+         own events dispatch FROM; it does not stop a different pointerId's events from
+         separately bubbling to this same document listener. */
+      if(ev.pointerId !== e.pointerId) return;
       const dx = ev.clientX - s.x, dy = ev.clientY - s.y;
       if(!dragStarted){
         if(Math.hypot(dx, dy) < DRAG_MOVE_THRESHOLD){
@@ -1292,6 +1068,7 @@ function buildDock(){
       if(activeDrag === cancel) activeDrag = null;
     };
     const up = ev=>{
+      if(ev.pointerId !== e.pointerId) return;   /* same pointerId filter as mv() above */
       peekLog = `UP(${ev.type})\n` + fields(ev); pdbgUpdate();
       teardown();
     };
@@ -1299,12 +1076,12 @@ function buildDock(){
       peekLog = `LOST CAPTURE (no up/cancel seen) — browser likely took the gesture\n` + fields(ev); pdbgUpdate();
       up(ev);
     };
-    /* Cancel path for cancelActiveDrag() (called from the touchstart listener the instant a
-       second finger is detected -- see that comment): tears down exactly like a normal
-       pointerup/cancel, releases capture, but writes no further geometry. Whatever position the
-       window is already at (mid-drag or not) is left as-is; toPinchMode(), which runs right
-       after this in the touchstart handler, picks it up from there via its own
-       getBoundingClientRect() read. */
+    /* Cancel path for cancelActiveDrag() (called by globalPinch(), near the end of this file,
+       at the capture-phase instant a second touch pointer is detected -- see that comment):
+       tears down exactly like a normal pointerup/cancel, releases capture, but writes no
+       further geometry. Whatever position the window is already at (mid-drag or not) is left
+       as-is -- there is nothing further for this window to do once a pinch takes over, since
+       floating windows need no geometry changes of their own during that gesture at all. */
     const cancel = ()=>{
       try{ cap.releasePointerCapture(e.pointerId); }catch(err){}
       peekLog = 'CANCELLED (multi-touch pinch started)\n' + fields(e); pdbgUpdate();
@@ -1318,23 +1095,16 @@ function buildDock(){
   document.addEventListener('keydown', e=>{ if(e.key !== 'Escape') return;
     dock.querySelectorAll('.peek.open').forEach(w=>w.classList.remove('open'));
     const f = document.activeElement && document.activeElement.closest && document.activeElement.closest('.peek.float'); if(f) unfloat(f); });
+  /* Reflows floated windows on an ordinary desktop window resize / orientation change.
+     REMOVED, Section 2n/4.16: a `pinchActive` guard used to sit at the top of this handler,
+     because on iOS Safari an active NATIVE two-finger pinch fires continuous `window` resize
+     events, and this handler would otherwise stomp the pinch-mode position:absolute
+     coordinates those events' own settle logic was managing. Now that native touch
+     pinch-zoom no longer reaches this page at all (globalPinch() captures it before the
+     browser does), nothing drives `window` resize during a pinch any more -- our own
+     zoom transform doesn't change innerWidth/innerHeight -- so there is no longer a
+     competing gesture for this handler to defer to, and the guard is gone with it. */
   window.addEventListener('resize', ()=>{
-    /* Found via a real-device report: on iOS Safari, an active native two-finger pinch fires
-       actual `window` resize events continuously throughout the gesture -- not just
-       `visualViewport` resize, which is the only one the pinch-mode settle logic above was
-       gated against. This handler predates pinch-mode entirely (it exists to reflow windows
-       on an ordinary desktop window resize / orientation change) and had no pinch awareness at
-       all, so during a pinch it kept firing, reading the window's LAYOUT-viewport-relative
-       getBoundingClientRect() and writing that straight into style.left/top -- correct for a
-       position:fixed window, but wrong for one currently in position:absolute pinch mode (whose
-       left/top are DOCUMENT-relative), stomping the correct pinch-mode position on every tick.
-       That mismatched read/write, repeated throughout the gesture, is what produced the
-       continuously-changing L/T and visible jitter a real iPad test caught that no synthetic
-       test did (the Playwright isolation tests only fired visualViewport resize events).
-       Skipping this handler entirely while pinch mode is active leaves its original behavior
-       (desktop resize / orientation-change reflow) untouched; a real resize that matters will
-       still be acted on once the gesture ends and pinch mode releases, via the existing settle. */
-    if(pinchActive) return;
     document.querySelectorAll('.peek.float').forEach(w=>{ if(narrow()) unfloat(w); else { const r = w.getBoundingClientRect(); clampBox(w, r.left, r.top, r.width, r.height); } });
   });
 }
@@ -2528,6 +2298,13 @@ if(window.visualViewport){
   let pend = null;
   document.addEventListener('pointerdown', e=>{
     if(e.button !== 0) return;
+    /* A two-finger touch pinch (globalPinch(), near the end of this file) must always own a
+       gesture over a single-finger pan that happened to be starting at the same moment.
+       globalPinch() calls window.PZ_CANCEL_PAN() at the capture phase the instant its second
+       touch pointer arrives -- BEFORE this bubble-phase listener runs for that same event --
+       so this check is the second line of defense, for a pointerdown that lands fractionally
+       after the pair was already complete. */
+    if(window.PZ_PINCHING && window.PZ_PINCHING()) return;
     if(!pannable(e.target, e.clientX, e.clientY)){
       lastDrag = `BLOCKED at (${e.clientX},${e.clientY}) target=${e.target.tagName}.${String(e.target.className||'').slice(0,30)}`;
       dbgUpdate();
@@ -2537,7 +2314,7 @@ if(window.visualViewport){
     lastDrag = `down (${e.clientX},${e.clientY}) target=${e.target.tagName} xEl=${xEl ? xEl.tagName + '.' + String(xEl.className||'').slice(0,20) : 'none'} yEl=${yEl ? yEl.tagName + '.' + String(yEl.className||'').slice(0,20) : 'none'} active=${active}`;
     dbgUpdate();
     pend = {
-      x:e.clientX, y:e.clientY, started:false, xEl, yEl,
+      id: e.pointerId, x:e.clientX, y:e.clientY, started:false, xEl, yEl,
       sl: xEl ? xEl.scrollLeft : window.scrollX,
       st: yEl ? yEl.scrollTop  : window.scrollY,
       tx0: tx, ty0: ty
@@ -2545,6 +2322,17 @@ if(window.visualViewport){
   });
   document.addEventListener('pointermove', e=>{
     if(!pend) return;
+    /* pointerId filter -- this listener is document-level with no pointer capture of its own,
+       so without this it reacts to ANY pointer's movement while pend is set, not just the one
+       that started this pan. A second touch pointer arriving mid-gesture (the start of a
+       pinch) would otherwise feed its own coordinates into THIS gesture's dx/dy math against
+       the first pointer's original down position -- a likely contributor to reported
+       flicker/jitter when a pinch begins while a one-finger pan is already under way.
+       globalPinch() already calls PZ_CANCEL_PAN() the instant a second touch pointer is
+       detected (see the pointerdown comment above), which clears pend entirely before this
+       could fire for the new pointer -- this filter is strictly a second line of defense, for
+       any event ordering that check doesn't cover. */
+    if(e.pointerId !== pend.id) return;
     const dx = e.clientX - pend.x, dy = e.clientY - pend.y;
     if(!pend.started){
       if(Math.hypot(dx, dy) < 4) return;
@@ -2586,12 +2374,144 @@ if(window.visualViewport){
   window.addEventListener('pointerup', end);
   window.addEventListener('pointercancel', end);
   window.addEventListener('blur', end);
+  /* Exposed for globalPinch() (near the end of this file): lets it clear a provisional
+     single-finger pan the instant a second touch pointer starts a pinch, without needing any
+     access to pend itself. Functionally identical to what a pointerup/pointercancel/blur
+     already does above -- this just gives another module a name to call it by. */
+  window.PZ_CANCEL_PAN = end;
 
   /* a real, always-readable zoom state for other features to key off — starting with
      buildRailToggle's rawAuto() below, so the burger doesn't regress now that the old
      signals it relied on (innerWidth, devicePixelRatio, the raw gesture tally) are
      superseded by this for anyone using this zoom path */
   window.PZ = { get k(){ return k; }, get active(){ return active; }, get tx(){ return tx; }, get ty(){ return ty; }, get wrapScrollWidth(){ return wrap.scrollWidth; } };
+  /* Exposed for globalPinch() (near the end of this file), the new two-finger touch-pinch
+     handler: a direct alias for this engine's own internal zoomAt(), so a touch pinch drives
+     the exact same k/tx/ty state and clamp/engage/disengage logic the trackpad ctrlKey-wheel
+     path above already drives -- one zoom engine, two input sources, not two competing ones.
+     (PZ_CANCEL_PAN, the other export globalPinch() uses, is set above, next to `end`.) */
+  window.PZ_ZOOM_AT = zoomAt;
+})();
+
+/* ---------------- global two-finger touch pinch ----------------
+   Replaces reliance on the browser's own native touch pinch-zoom, which is fundamentally
+   incompatible with position:fixed UI chrome (the WebKit fixed-during-live-pinch desync
+   documented at length in the project doc, Section 2f/4.9/4.13). The entire
+   position:fixed<->position:absolute pinch-mode workaround previously in buildDock() --
+   toPinchMode()/fromPinchMode(), the symmetric scale-based settle gate, the scrollend/
+   debounce race, the blur/visibilitychange safety net, and the #pinchdebug overlay that went
+   with it -- existed only to paper over that incompatibility, and has been removed outright
+   as of this rebuild (Section 2n/4.16 in the project doc), not left dormant: it was triggered
+   by raw touchstart, which fires regardless of touch-action, so leaving it in place would
+   still run in parallel with this handler and immediately re-conflict with it.
+
+   This drives the SAME pageZoom() state (k/tx/ty, via window.PZ_ZOOM_AT, an alias for that
+   engine's own internal zoomAt()) already used by the trackpad ctrlKey-wheel path, using the
+   exact two-pointer Pointer-Events shape already proven in fwBindZoom() above (pts: a
+   Map<pointerId,{x,y}> of currently-down touch pointers; pinch: a {d,k} distance/zoom
+   snapshot taken the instant the 2nd pointer arrives; each subsequent move recomputes the
+   distance and scales k by the ratio). Floating windows need no special handling here at all:
+   they are position:fixed children of document.body, entirely outside #pzlayer (the only
+   element this transform ever touches), so they are structurally unaffected by this zoom
+   regardless of where on the page the pinch happens to start -- exactly mirroring the
+   already-working trackpad behavior Sid asked this to match (pinching over a floating window
+   with a trackpad already just zooms the main page and leaves the window alone, for the same
+   structural reason).
+
+   OWNERSHIP, not just zoom math, is the point of this handler running where it does: all
+   three listeners below are registered on `document` at the CAPTURE phase (the third
+   addEventListener argument), which fires before any bubble-phase listener on that same node
+   gets the event -- including both buildDock()'s own drag-start pointerdown handler and
+   pageZoom()'s own pend-based pan-start pointerdown handler, which are both plain (bubble-
+   phase) document listeners. That ordering guarantee is what lets the exact instant a second
+   touch pointer arrives (a) cancel a provisional single-finger window drag
+   (window.DOCK_CANCEL_DRAG) and (b) clear a provisional single-finger page pan
+   (window.PZ_CANCEL_PAN) BEFORE either system's own bubble-phase pointerdown handler for that
+   same second touch gets a chance to run and start a new drag/pan of its own for it. Both of
+   those handlers also separately check window.PZ_PINCHING() themselves, as a second line of
+   defense for a pointerdown that happens to arrive a tick after the pair was already
+   complete, rather than depending solely on event-ordering within a single dispatch.
+
+   .fwview is explicitly excluded, the same way pageZoom()'s own ctrlKey-wheel handler already
+   defers to it for trackpad pinch: the framework tree canvas owns its own independent
+   two-finger pinch via fwBindZoom() above, so a touch that starts there is left alone
+   entirely rather than tracked here. */
+(function globalPinch(){
+  const pts = new Map();   // pointerId -> {x,y}, every touch pointer currently down
+  let pinch = null;        // {d,k}: distance and PZ.k snapshot at the instant the pair formed
+
+  document.addEventListener('pointerdown', e=>{
+    if(e.pointerType !== 'touch') return;
+    if(e.target && e.target.closest && e.target.closest('.fwview')) return;   /* fwBindZoom owns this */
+    pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if(pts.size === 2){
+      const [a,b] = [...pts.values()];
+      pinch = {d: Math.hypot(a.x-b.x, a.y-b.y), k: window.PZ ? window.PZ.k : 1};
+      /* Order matters: release any provisional single-pointer gesture FIRST, before either
+         system's own bubble-phase pointerdown handler for this same event runs (capture
+         fires top-down before bubble on the same node, so both calls below complete before
+         pageZoom's/buildDock's own document pointerdown listeners see this event at all). */
+      if(window.DOCK_CANCEL_DRAG) window.DOCK_CANCEL_DRAG();
+      if(window.PZ_CANCEL_PAN) window.PZ_CANCEL_PAN();
+    }
+    /* A third (or later) finger landing mid-pinch is tracked (so lifting it back off still
+       correctly leaves a live 2-pointer pinch) but never participates in the distance/
+       midpoint math below, which only ever reads the first two values currently in the map. */
+  }, {capture:true});
+
+  document.addEventListener('pointermove', e=>{
+    if(!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if(!pinch || pts.size < 2) return;
+    const [a,b] = [...pts.values()];
+    const d = Math.hypot(a.x-b.x, a.y-b.y);
+    /* Main-surface touch-action is pan-x pan-y (see shell.css), not none, because ordinary
+       single-finger scrolling over text deliberately still relies on the browser's own native
+       pan recognition (see pannable()/overGlyph() in pageZoom() above) -- so native 2-finger
+       PANNING, unlike pinch-zoom/double-tap-zoom, is still a live, allowed gesture here. Once
+       this code has decided a real 2-pointer PINCH is in progress, preventDefault() stops that
+       native pan recognizer from also acting on the same two touches at the same time, which
+       would otherwise fight with the zoom this is about to apply. This is the pinch-specific
+       counterpart to e.preventDefault() in pageZoom()'s own wheel/pend handlers above -- same
+       principle (claim the gesture explicitly once we've decided to own it), different input. */
+    e.preventDefault();
+    if(pinch.d > 0 && window.PZ_ZOOM_AT) window.PZ_ZOOM_AT(pinch.k * (d/pinch.d), (a.x+b.x)/2, (a.y+b.y)/2);
+  }, {capture:true});
+
+  const up = e=>{
+    pts.delete(e.pointerId);
+    if(pts.size < 2) pinch = null;
+  };
+  document.addEventListener('pointerup', up, {capture:true});
+  document.addEventListener('pointercancel', up, {capture:true});
+
+  /* Live touch-pointer count, read by buildDock()'s and pageZoom()'s own pointerdown handlers
+     as their second line of defense against starting a drag/pan on top of an active pinch. */
+  window.PZ_PINCHING = ()=> pts.size >= 2;
+})();
+
+/* TEMP DEBUG, preview only — requested live readout of the iPad mini's actual width/breakpoint
+   state, while this file was already being touched for the touch-pinch rebuild. Separate from
+   every other debug overlay (#pzdebug, #peekdebug) so it keeps reporting regardless of zoom or
+   drag state. The breakpoint test mirrors buildDock()'s own narrow() exactly (max-width:1023px
+   — see the comment by narrow() in buildDock() for why that particular number). Remove before
+   anything goes near live, same as the other debug overlays. */
+(function buildMiniDebug(){
+  const el = document.createElement('div');
+  el.id = 'minidebug';
+  el.style.cssText = 'position:fixed;bottom:4px;left:4px;z-index:99999;background:rgba(0,0,0,.75);'
+    + 'color:#ff0;font:11px/1.5 monospace;padding:5px 8px;border-radius:4px;pointer-events:none;'
+    + 'white-space:pre';
+  document.body.appendChild(el);
+  const mq = window.matchMedia('(max-width:1023px)');
+  function update(){
+    const vv = window.visualViewport;
+    el.textContent = `innerWidth=${window.innerWidth}  vv.width=${vv ? vv.width.toFixed(0) : 'n/a'}\n`
+      + `narrow (<=1023px, dock's own breakpoint) = ${mq.matches}`;
+  }
+  update();
+  window.addEventListener('resize', update);
+  if(window.visualViewport) window.visualViewport.addEventListener('resize', update);
 })();
 
 render();

@@ -32,6 +32,46 @@
   --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
 }
 *{box-sizing:border-box}
+/* OWNERSHIP MODEL, not a default hardening rule -- verified against this app's actual touch
+   surfaces before being set, not assumed from the value's name (see the project doc, Section
+   2n/4.16, "touch-action verification").
+
+   Goal: native two-finger pinch-zoom and native double-tap-zoom must never compete with the
+   app's own custom zoom (pageZoom() + globalPinch() in shell.js), on ANY touch surface of this
+   page -- while native single-finger (and two-finger) PANNING must be completely unaffected,
+   because large parts of this page still genuinely depend on it:
+     - Over ordinary reading text, pageZoom()'s own click/touch-drag-to-pan handler
+       deliberately steps aside (its pannable() check calls overGlyph() to detect "this pixel
+       is actually on a rendered character" and refuses to start a custom pan there, on
+       purpose, so taps and selection on text keep working) -- which means native touch
+       scrolling is the ONLY thing that scrolls the page when a finger starts on text. Setting
+       touch-action:none anywhere that text can appear would silently kill scrolling there
+       entirely, with nothing else picking up the gesture.
+     - Everywhere else on the main content surface, pageZoom()'s own pend-based pan handler
+       already drives panning itself (via pointermove + preventDefault + manual scrollTo/
+       transform, not native scrolling) -- so touch-action's pan-vs-no-pan setting doesn't
+       change what drives panning there, only whether the BROWSER is also allowed to recognize
+       a pinch/double-tap on top of it.
+   `touch-action: pan-x pan-y` is the one value that satisfies both: pan-x/pan-y are
+   specifically the native single- and multi-finger PANNING gestures, so including them keeps
+   every case above working exactly as today; pinch-zoom and double-tap-zoom are NOT in that
+   list, so the browser stops recognizing either the moment this is set, leaving touch pinch
+   free for globalPinch() (shell.js) to own without a competing native gesture. `none` was
+   considered and rejected specifically because it would also suppress native text scrolling
+   above, which this app has no replacement for.
+
+   Applied at the root, not scoped to #pagezoom/.wrap: #dock and every floating .peek window
+   are appended directly to document.body, outside .wrap entirely, so a root-level rule is
+   what actually reaches every touch surface on the page, docked or floated. This composes
+   correctly with the more restrictive touch-action:none already set on .peek.float > header,
+   .peek.float .pbody, .rz and .splitter (search this file for "touch-action" to see all of
+   them): touch-action for a given touch point is the INTERSECTION of its own value and every
+   ancestor's, which is always the most restrictive of the two -- so this root-level pan-x
+   pan-y can only ever be narrowed by those, never override them. Those elements keep fully
+   owning their own drag/resize gestures exactly as before; .fwview (the framework tree
+   canvas, already touch-action:none) is unaffected for the same reason -- it already owns its
+   own independent pinch via fwBindZoom() in shell.js and was never relying on this rule. */
+html{touch-action:pan-x pan-y}
 body{margin:0; background:var(--ground); color:var(--ink);
   font-family:"Public Sans",ui-sans-serif,system-ui,sans-serif; font-size:15px; line-height:1.55}
 .wrap{max-width:1260px; margin:0 auto; padding-inline:16px; padding-block:26px 72px}
