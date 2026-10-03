@@ -1149,6 +1149,22 @@ function buildDock(){
     dock.querySelectorAll('.peek.open').forEach(w=>w.classList.remove('open'));
     const f = document.activeElement && document.activeElement.closest && document.activeElement.closest('.peek.float'); if(f) unfloat(f); });
   window.addEventListener('resize', ()=>{
+    /* Found via a real-device report: on iOS Safari, an active native two-finger pinch fires
+       actual `window` resize events continuously throughout the gesture -- not just
+       `visualViewport` resize, which is the only one the pinch-mode settle logic above was
+       gated against. This handler predates pinch-mode entirely (it exists to reflow windows
+       on an ordinary desktop window resize / orientation change) and had no pinch awareness at
+       all, so during a pinch it kept firing, reading the window's LAYOUT-viewport-relative
+       getBoundingClientRect() and writing that straight into style.left/top -- correct for a
+       position:fixed window, but wrong for one currently in position:absolute pinch mode (whose
+       left/top are DOCUMENT-relative), stomping the correct pinch-mode position on every tick.
+       That mismatched read/write, repeated throughout the gesture, is what produced the
+       continuously-changing L/T and visible jitter a real iPad test caught that no synthetic
+       test did (the Playwright isolation tests only fired visualViewport resize events).
+       Skipping this handler entirely while pinch mode is active leaves its original behavior
+       (desktop resize / orientation-change reflow) untouched; a real resize that matters will
+       still be acted on once the gesture ends and pinch mode releases, via the existing settle. */
+    if(pinchActive) return;
     document.querySelectorAll('.peek.float').forEach(w=>{ if(narrow()) unfloat(w); else { const r = w.getBoundingClientRect(); clampBox(w, r.left, r.top, r.width, r.height); } });
   });
 }
