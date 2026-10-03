@@ -655,7 +655,20 @@ tspan.term{border-bottom:0; text-decoration:underline dotted; text-decoration-th
    users to read long content, so disabling native touch scrolling there is a real tradeoff,
    not a free fix — left for a deliberate decision rather than silently applied. */
 .peek.float > header{cursor:grab; flex:none; user-select:none; padding-right:20px; touch-action:none}
-.peek.float .pbody{flex:1 1 auto; min-height:0; max-height:none; overflow:auto; cursor:grab}
+/* touch-action:none added here after a real device re-test confirmed the §2d tradeoff was
+   costing more than it saved: dragging from blank space WITHIN a floated window's body was
+   reported as "sometimes works, sometimes doesn't, and sometimes the main page moves too" on
+   both Windows 11 touch and iPad — the exact fingerprint of the browser's native-scroll
+   recognizer intermittently racing the JS drag for ownership of the gesture (same mechanism as
+   the header fix in §2d/§4.6, just on the one element that was deliberately left out). The
+   tradeoff this accepts: a touch user can no longer scroll a floated window's own long content
+   by swiping inside it (native scroll is exactly what touch-action:none suppresses) — but this
+   matches the EXISTING mouse behavior already in place, where click-drag in pbody moves the
+   window, never scrolls its content (a mouse already has to use the wheel to scroll pbody, not
+   drag) — so this isn't a new asymmetry, it's bringing touch in line with a UX choice already
+   made for mouse. If a floated window's content is too long to read without scrolling on touch,
+   that's a known follow-up (e.g. a visible scroll affordance), not solved by this change. */
+.peek.float .pbody{flex:1 1 auto; min-height:0; max-height:none; overflow:auto; cursor:grab; touch-action:none}
 .peek.float #tree{cursor:grab}
 .peek.float #peekTree #tree, .peek#peekTree.float #tree{width:100%; height:auto; max-height:none}
 .peek.float.dragging, .peek.float.dragging *{cursor:grabbing !important; user-select:none}
