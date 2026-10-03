@@ -2219,7 +2219,45 @@ if(window.visualViewport){
     + 'color:#fff;font:11px/1.5 monospace;padding:5px 8px;border-radius:4px;pointer-events:none;white-space:pre';
   document.body.appendChild(dbg);
   let ctrlTicks = 0, plainTicks = 0, lastWheel = 'none yet', lastDrag = 'none yet';
-  function dbgUpdate(){
+
+  /* 2026-10: rAF batching/perf pass. Raw pointermove/wheel events can arrive far faster than
+     the display can paint (a touch surface on iPad Pro firing well above 60/s). The previous
+     code did a full clampPan() (two forced-layout reads: window.innerWidth/innerHeight and
+     wrap.scrollWidth/scrollHeight) plus a transform write plus a dbgUpdate() string-build-and-
+     textContent-write on EVERY single raw event, whether or not the display had any chance of
+     showing an intermediate frame. That's the likely source of the reported hit-or-miss
+     jitter/stiffness, including on plain white space (ruling out any per-element cause).
+
+     requestPaint()/requestDebug() (dbgUpdate() is kept as the external name, just redefined)
+     replace that with two sticky flags serviced by a single shared requestAnimationFrame
+     callback, so no matter how many raw events land in one frame, the actual layout-forcing
+     read (clampPan) and the actual visual write (the transform / the debug text) each happen
+     at most once per frame. Both the pinch path (zoomAt, called from globalPinch()) and the
+     plain click-drag pan path funnel through requestPaint(), so they now share one scheduler.
+
+     engage()/disengage() deliberately do NOT go through this — they're rare, one-time layout
+     transitions (not per-event steady-state work) and disengage() in particular needs its
+     final state visible immediately, not a frame later. */
+  let needsPaint = false, needsDebug = false, rafScheduled = false;
+  function scheduleFrame(){
+    if(rafScheduled) return;
+    rafScheduled = true;
+    requestAnimationFrame(frameTick);
+  }
+  function frameTick(){
+    rafScheduled = false;
+    if(needsPaint){
+      needsPaint = false;
+      clampPan();
+      applyTransformNow();
+    }
+    if(needsDebug){
+      needsDebug = false;
+      renderDebug();
+    }
+  }
+  function requestPaint(){ needsPaint = true; scheduleFrame(); }
+  function renderDebug(){
     dbg.textContent = `zoom ${k.toFixed(2)}x · ${active ? 'CONTROLLED' : 'native'}\n`
       + `tx=${tx.toFixed(1)}  ty=${ty.toFixed(1)}\n`
       + `window.scrollX=${window.scrollX}  scrollY=${window.scrollY}\n`
@@ -2227,8 +2265,16 @@ if(window.visualViewport){
       + `last wheel: ${lastWheel}\n`
       + `last drag: ${lastDrag}`;
   }
+  /* Kept as the name every existing call site already uses -- now a cheap flag-set instead of
+     an immediate string build + DOM write. Per-event callers (the wheel/drag handlers below)
+     need no changes beyond this redefinition to stop hammering the DOM on every tick. */
+  function dbgUpdate(){ needsDebug = true; scheduleFrame(); }
 
-  function apply(){ layer.style.transform = active ? `scale(${k}) translate(${tx}px, ${ty}px)` : ''; dbgUpdate(); }
+  /* The immediate, unbatched transform write -- used directly by disengage() (a rare,
+     synchronous gesture-end transition that must be visible instantly, not deferred a frame)
+     and by frameTick() above (the batched steady-state path). Never call this directly from a
+     per-event handler; call requestPaint() instead. */
+  function applyTransformNow(){ layer.style.transform = active ? `scale(${k}) translate(${tx}px, ${ty}px)` : ''; }
   /* Bounds tx/ty to where the content actually has room to go — it must never FORCE a
      value, only constrain one already set by engage()/zoomAt()/a drag. The previous
      version re-centered tx/ty the instant content was narrower than the viewport at the
@@ -2278,7 +2324,11 @@ if(window.visualViewport){
     pz.style.position = ''; pz.style.inset = ''; pz.style.overflow = '';
     k = 1; tx = 0; ty = 0;
     document.documentElement.classList.remove('pz-active');
-    apply();
+    /* Cancel any paint still pending from the instant before this transition -- it would
+       otherwise run on the NEXT frame and reapply stale pre-disengage k/tx/ty on top of the
+       reset just done above. disengage() always wants its own state visible immediately. */
+    needsPaint = false;
+    applyTransformNow();
     window.scrollTo(gx, gy);
   }
   function zoomAt(nextK, cx, cy){
@@ -2288,8 +2338,7 @@ if(window.visualViewport){
     const localX = cx / k - tx, localY = cy / k - ty;
     k = nextK;
     tx = cx / k - localX; ty = cy / k - localY;
-    clampPan();
-    apply();
+    requestPaint();
     if(active && k <= K_MIN) disengage();
   }
 
@@ -2333,7 +2382,7 @@ if(window.visualViewport){
     if(scrollAncestor(e.target, 'x') || scrollAncestor(e.target, 'y')){ dbgUpdate(); return; } /* an inner panel's own scrollbar handles it */
     e.preventDefault();
     tx -= e.deltaX / k; ty -= e.deltaY / k;
-    clampPan(); apply();
+    requestPaint();
     dbgUpdate();
   }, {passive:false});
 
@@ -2389,7 +2438,7 @@ if(window.visualViewport){
     if(active){
       if(!pend.xEl) tx = pend.tx0 + dx / k;
       if(!pend.yEl) ty = pend.ty0 + dy / k;
-      clampPan(); apply();
+      requestPaint();
     } else {
       const wx = pend.xEl ? window.scrollX : pend.sl - dx;
       const wy = pend.yEl ? window.scrollY : pend.st - dy;
