@@ -814,7 +814,38 @@ function buildDock(){
   const DIRS = ['n','s','e','w','ne','nw','se','sw'];
   const floatIt = w=>{
     if(w.classList.contains('float') || narrow()) return;
-    const r = w.getBoundingClientRect();
+    /* On a mouse, hovering already added 'open' (the real hover-enlarged size/position) before
+       the click that lands here, so measuring the current rect has always captured the intended
+       expanded box. Touch has no hover state at all — a tap goes straight to 'click' with 'open'
+       never added — so without this, r below would capture the small COLLAPSED dock-slot rect
+       (clamp(88px,...,176px) wide, sitting right at the dock's position near the screen edge).
+       clampBox then clamps that undersized width up to its PEEK_MIN_W floor rather than the
+       intended 380-660px open size, at a position computed for the small box — so the floated
+       window ends up both too small and positioned so far toward the dock's edge that most of it
+       sits off-screen, matching the reported "only the top-left quadrant is visible" on touch.
+       Forcing 'open' first makes touch measure the same real expanded box mouse always measured;
+       for mouse this is a no-op, since 'open' is already there. */
+    /* .peek has `transition:width .16s ease` (for the mouse hover-enlarge animation), so forcing
+       'open' and reading getBoundingClientRect() in the very same tick — with the transition
+       still live — captures the FROM value (0ms elapsed = pre-change width), not the target
+       380-660px size: the transition hasn't actually animated anywhere yet. transition:none has
+       to be set first so the width resolves to its final value immediately, with nothing to
+       interpolate. (First attempt at this fix missed this and still measured ~240px — caught by
+       a Playwright check asserting the floated width against the CSS-declared minimum, not by
+       assuming the class toggle alone was enough.) */
+    const wasOpen = w.classList.contains('open');
+    let r;
+    if(wasOpen){
+      r = w.getBoundingClientRect();
+    } else {
+      const prevTransition = w.style.transition;
+      w.style.transition = 'none';
+      w.classList.add('open');
+      void w.offsetWidth;
+      r = w.getBoundingClientRect();
+      w.classList.remove('open');
+      w.style.transition = prevTransition;
+    }
     w.style.transition = 'none'; w.classList.remove('open'); const c = w.getBoundingClientRect(); w.classList.add('open');   /* the size of its slot in the dock */
     const ph = document.createElement('div'); ph.className = 'peekph'; ph.style.height = c.height + 'px'; ph.style.width = c.width + 'px';
     w.parentNode.insertBefore(ph, w); w._ph = ph;
@@ -2168,11 +2199,24 @@ if(window.visualViewport){
     }
     lastDrag = `move dx=${dx} dy=${dy} xEl=${pend.xEl ? 'yes' : 'no'} yEl=${pend.yEl ? 'yes' : 'no'}`;
   });
+  /* pointercancel, not just pointerup, must clear pend. A touch that gets reinterpreted by the
+     browser mid-gesture (a tap on blank background that the browser's own gesture recognizer
+     decides isn't a drag, or any touch interrupted by another system taking over — e.g. the
+     dock's floating-window drag starting immediately after) delivers pointercancel instead of
+     pointerup. Without this, pend survives indefinitely as stale state: the next unrelated
+     pointermove sequence anywhere on the page — including the dock's own floating-window drag,
+     whose pointermove events bubble through this same document-level listener — gets treated as
+     a continuation of that old, already-finished pan gesture using its stale baseline
+     coordinates, moving the main page at the same time as whatever else is legitimately handling
+     that gesture. This was confirmed from a real report: touch the background once (no drag
+     started, so no pointerup/pointercancel distinction was visible), then drag a floating dock
+     window — both the window AND the main page moved together. */
   const end = ()=>{
     if(pend && pend.started) document.documentElement.classList.remove('panning');
     pend = null;
   };
   window.addEventListener('pointerup', end);
+  window.addEventListener('pointercancel', end);
   window.addEventListener('blur', end);
 
   /* a real, always-readable zoom state for other features to key off — starting with
