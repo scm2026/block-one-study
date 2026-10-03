@@ -851,10 +851,90 @@ function buildDock(){
      as before (scrollend if it fires, the debounce otherwise). This doesn't change anything for
      non-touch input (trackpad/mouse never touch this gate — activeTouches stays 0 for them, so
      scheduleSettle behaves exactly as it did before this revision). */
+  /* PLATFORM CONSTRAINT, not a logic bug: a minimal, JS-free reproduction (one position:fixed
+     box, nothing else on the page) jitters identically to these real floating windows during an
+     active native two-finger pinch on iPad/WebKit, specifically around the zoom-out rubber-band
+     limit; the same box as position:absolute does not. This was confirmed by disabling every
+     line of this file's own geometry writes (including the settle logic right below) and still
+     seeing the real window jitter exactly like the bare repro — so no amount of re-clamping,
+     debouncing, or touch-gating here was ever going to fix it, because the browser's own live
+     compositing of a fixed element through the pinch transform is the thing moving it, not this
+     code. The mitigation: stay position:fixed for all ordinary use (so scroll-following behavior
+     is unchanged), and temporarily become position:absolute for the duration of a native pinch
+     only, switching back once it settles. See toPinchMode/fromPinchMode below. */
+  /* TEMP DEBUG, preview only — added specifically to answer one question: is toPinchMode()
+     actually running during a real on-device pinch at all? None of the other three debug
+     overlays (#pzdebug, #navdebug, #peekdebug) touch pinch state -- they only update on wheel
+     zoom or an active window drag -- so a background two-finger pinch with no window drag
+     involved leaves all three looking completely static whether or not this code ran. That
+     made an earlier device report ambiguous. This one is unambiguous: live touch count,
+     whether pinch mode is currently engaged, and the actual position/left/top of every floated
+     window, refreshed on every relevant event. Remove before anything goes near live, same as
+     the other three. */
+  const pinchDbg = document.createElement('div');
+  pinchDbg.id = 'pinchdebug';
+  pinchDbg.style.cssText = 'position:fixed;top:4px;right:4px;z-index:99999;background:rgba(0,0,0,.75);'
+    + 'color:#0f0;font:11px/1.5 monospace;padding:5px 8px;border-radius:4px;pointer-events:none;'
+    + 'white-space:pre;transform:translateY(260px)';
+  document.body.appendChild(pinchDbg);
+  function pinchDbgUpdate(touchCount){
+    const wins = Array.from(document.querySelectorAll('.peek.float')).map((w,i)=>{
+      const s = getComputedStyle(w);
+      return `  win${i}: pos=${s.position} L=${Math.round(parseFloat(s.left))} T=${Math.round(parseFloat(s.top))}`
+        + (w.classList.contains('dragging') ? ' DRAGGING' : '');
+    }).join('\n');
+    pinchDbg.textContent = `touches=${touchCount} pinchActive=${pinchActive}\n${wins || '  (no floated windows)'}`;
+  }
+  let pinchActive = false;
+  pinchDbgUpdate(0);
+  const toPinchMode = ()=>{
+    if(pinchActive) return;
+    pinchActive = true;
+    const vv = window.visualViewport;
+    document.querySelectorAll('.peek.float').forEach(w=>{
+      if(w.classList.contains('dragging')) return;   /* never touch geometry on a window mid-drag */
+      const r = w.getBoundingClientRect();
+      /* getBoundingClientRect() is LAYOUT-viewport-relative (the same space as pointer
+         clientX/Y) and is unaffected by the live pinch transform, which only moves the VISUAL
+         viewport. position:absolute needs DOCUMENT-relative coordinates, so the layout
+         viewport's own distance from the document origin has to be added to it. That distance
+         is deliberately sourced from the VisualViewport API rather than window.scrollX/scrollY:
+         vv.pageLeft is the visual viewport's distance from the document origin, vv.offsetLeft is
+         the visual viewport's distance from the layout viewport's origin, so (pageLeft -
+         offsetLeft) is exactly the layout viewport's own distance from the document origin — the
+         quantity window.scrollX nominally represents, but read from the one API actually
+         specified to stay correct through an active native zoom/pan, rather than leaning on
+         scroll-position reporting during the single gesture most likely to stress it.
+           documentLeft = clientRect.left + (vv.pageLeft - vv.offsetLeft)
+           documentTop  = clientRect.top  + (vv.pageTop  - vv.offsetTop)
+         Written once, here, at gesture start — never again until fromPinchMode() at settle. */
+      const docL = r.left + (vv ? (vv.pageLeft - vv.offsetLeft) : window.scrollX);
+      const docT = r.top  + (vv ? (vv.pageTop  - vv.offsetTop)  : window.scrollY);
+      w.dataset.pinchAbs = '1';
+      w.style.position = 'absolute';
+      w.style.left = docL + 'px';
+      w.style.top = docT + 'px';
+    });
+  };
+  const fromPinchMode = ()=>{
+    if(!pinchActive) return;
+    pinchActive = false;
+    document.querySelectorAll('.peek.float[data-pinch-abs]').forEach(w=>{
+      delete w.dataset.pinchAbs;
+      /* getBoundingClientRect() always reflects the element's actual on-screen, layout-viewport-
+         relative position regardless of which position mode produced it — so reading it here
+         (now that the gesture has settled and the page has stopped moving) and writing it
+         straight back as position:fixed left/top needs no conversion, unlike the swap above. */
+      const r = w.getBoundingClientRect();
+      w.style.position = 'fixed';
+      clampBox(w, r.left, r.top, r.width, r.height);
+    });
+  };
   if(window.visualViewport){
     const FLOAT_SETTLE_DEBOUNCE = 150;
     let settleTimer = null, activeTouches = 0;
     const reclampAll = ()=>{
+      fromPinchMode();
       document.querySelectorAll('.peek.float').forEach(w=>{ const r = w.getBoundingClientRect(); clampBox(w, r.left, r.top, r.width, r.height); });
     };
     const scheduleSettle = ()=>{
@@ -862,14 +942,30 @@ function buildDock(){
       if(activeTouches > 0) return;   /* a finger is still on the glass -- the gesture isn't over, don't settle yet */
       settleTimer = setTimeout(reclampAll, FLOAT_SETTLE_DEBOUNCE);
     };
-    document.addEventListener('touchstart', e=>{ activeTouches = e.touches.length; clearTimeout(settleTimer); }, {passive:true});
-    document.addEventListener('touchend', e=>{ activeTouches = e.touches.length; if(activeTouches === 0) scheduleSettle(); }, {passive:true});
-    document.addEventListener('touchcancel', e=>{ activeTouches = e.touches.length; if(activeTouches === 0) scheduleSettle(); }, {passive:true});
+    document.addEventListener('touchstart', e=>{
+      activeTouches = e.touches.length;
+      clearTimeout(settleTimer);
+      if(activeTouches >= 2) toPinchMode();   /* two fingers down is the one unambiguous "native pinch may be starting" signal */
+      pinchDbgUpdate(activeTouches);
+    }, {passive:true});
+    document.addEventListener('touchmove', e=>{ pinchDbgUpdate(e.touches.length); }, {passive:true});
+    document.addEventListener('touchend', e=>{ activeTouches = e.touches.length; if(activeTouches === 0) scheduleSettle(); pinchDbgUpdate(activeTouches); }, {passive:true});
+    document.addEventListener('touchcancel', e=>{ activeTouches = e.touches.length; if(activeTouches === 0) scheduleSettle(); pinchDbgUpdate(activeTouches); }, {passive:true});
     window.visualViewport.addEventListener('resize', scheduleSettle);
     window.visualViewport.addEventListener('scroll', scheduleSettle);
     if('onscrollend' in window){
-      document.addEventListener('scrollend', ()=>{ if(activeTouches === 0){ clearTimeout(settleTimer); reclampAll(); } });
+      document.addEventListener('scrollend', ()=>{ if(activeTouches === 0){ clearTimeout(settleTimer); reclampAll(); pinchDbgUpdate(activeTouches); } });
     }
+    /* SAFETY NET for a gesture interrupted in a way that never delivers touchend/touchcancel at
+       all -- e.g. the OS swaps away from the browser, a system sheet/permission prompt steals
+       focus, or the tab is backgrounded, all mid-pinch. Nothing above fires in that case, so
+       activeTouches could get stuck > 0 forever and a window would be stranded in
+       position:absolute pinch mode indefinitely. On regaining focus/visibility, there is no way
+       to know the real touch count, so treat it as "gesture over" unconditionally: reset
+       activeTouches to 0 and force a settle regardless of its previous value. */
+    const forceSettle = ()=>{ activeTouches = 0; clearTimeout(settleTimer); reclampAll(); pinchDbgUpdate(0); };
+    window.addEventListener('blur', forceSettle);
+    document.addEventListener('visibilitychange', ()=>{ if(document.hidden) forceSettle(); });
   }
   let zTop = 60; const raise = w=>{ w.style.zIndex = ++zTop; };
   const DIRS = ['n','s','e','w','ne','nw','se','sw'];
