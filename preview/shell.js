@@ -883,12 +883,14 @@ function buildDock(){
     + 'white-space:pre';
   document.body.appendChild(pinchDbg);
   function pinchDbgUpdate(touchCount){
+    const vv = window.visualViewport;
+    const scaleStr = vv ? vv.scale.toFixed(3) : 'n/a';
     const wins = Array.from(document.querySelectorAll('.peek.float')).map((w,i)=>{
       const s = getComputedStyle(w);
       return `  win${i}: pos=${s.position} L=${Math.round(parseFloat(s.left))} T=${Math.round(parseFloat(s.top))}`
         + (w.classList.contains('dragging') ? ' DRAGGING' : '');
     }).join('\n');
-    pinchDbg.textContent = `touches=${touchCount} pinchActive=${pinchActive}\n${wins || '  (no floated windows)'}`;
+    pinchDbg.textContent = `touches=${touchCount} pinchActive=${pinchActive} scale=${scaleStr}\n${wins || '  (no floated windows)'}`;
   }
   let pinchActive = false;
   pinchDbgUpdate(0);
@@ -937,15 +939,46 @@ function buildDock(){
   };
   if(window.visualViewport){
     const FLOAT_SETTLE_DEBOUNCE = 150;
+    /* Tolerance for "back at native-zoom baseline". visualViewport.scale is never exactly 1.000
+       at rest on every device/browser combo (sub-pixel/float noise), so treat anything within
+       this band of 1 as settled rather than requiring an exact match. */
+    const SETTLE_SCALE_EPS = 1.02;
     let settleTimer = null, activeTouches = 0;
     const reclampAll = ()=>{
       fromPinchMode();
       document.querySelectorAll('.peek.float').forEach(w=>{ const r = w.getBoundingClientRect(); clampBox(w, r.left, r.top, r.width, r.height); });
     };
+    /* GESTURE ENDING (fingers lifted) IS NOT THE SAME EVENT AS THE PAGE RETURNING TO AN UNZOOMED
+       BASELINE. The original version of this settle path treated activeTouches hitting 0 as the
+       single signal that it was safe to switch floated windows back to position:fixed. That's
+       correct after a zoom-OUT, which tends to end back near scale 1 (the rubber-band floor
+       pulls it there) -- but after a zoom-IN, lifting your fingers leaves the page zoomed in,
+       not at baseline. Switching back to position:fixed at that point immediately re-exposes the
+       exact desync Section 2f/4.9 exists to avoid (a position:fixed element is pinned to the
+       un-zoomed layout viewport while the browser is still actively rendering a zoomed, panned
+       visual viewport) -- reported as floated windows jumping to the wrong place the instant
+       fingers lift, worse the further the page had been panned from the zoom's anchor point.
+       Fix: gate the actual position:fixed restoration on BOTH activeTouches===0 AND
+       visualViewport.scale being back within SETTLE_SCALE_EPS of 1. If touches hit zero while
+       scale is still elevated, do NOTHING -- the window's document-relative left/top, written
+       once at gesture start by toPinchMode(), is already correct and needs no further write (see
+       "zero geometry writes in between" in Section 2f) -- and rely on the existing
+       visualViewport 'resize'/'scroll' listeners (which already call scheduleSettle() on every
+       tick) to re-invoke this check once scale has actually come back down, with no separate
+       polling loop needed. */
+    const maybeSettle = ()=>{
+      if(activeTouches > 0) return;   /* a finger is still on the glass -- the gesture isn't over, don't settle yet */
+      const vv = window.visualViewport;
+      if(pinchActive && vv && vv.scale > SETTLE_SCALE_EPS){
+        pinchDbgUpdate(activeTouches);   /* reflect the "waiting for baseline" state in the overlay, but write nothing to the windows */
+        return;
+      }
+      reclampAll();
+    };
     const scheduleSettle = ()=>{
       clearTimeout(settleTimer);
       if(activeTouches > 0) return;   /* a finger is still on the glass -- the gesture isn't over, don't settle yet */
-      settleTimer = setTimeout(reclampAll, FLOAT_SETTLE_DEBOUNCE);
+      settleTimer = setTimeout(maybeSettle, FLOAT_SETTLE_DEBOUNCE);
     };
     document.addEventListener('touchstart', e=>{
       activeTouches = e.touches.length;
@@ -959,16 +992,31 @@ function buildDock(){
     window.visualViewport.addEventListener('resize', scheduleSettle);
     window.visualViewport.addEventListener('scroll', scheduleSettle);
     if('onscrollend' in window){
-      document.addEventListener('scrollend', ()=>{ if(activeTouches === 0){ clearTimeout(settleTimer); reclampAll(); pinchDbgUpdate(activeTouches); } });
+      document.addEventListener('scrollend', ()=>{ if(activeTouches === 0){ clearTimeout(settleTimer); maybeSettle(); pinchDbgUpdate(activeTouches); } });
     }
     /* SAFETY NET for a gesture interrupted in a way that never delivers touchend/touchcancel at
        all -- e.g. the OS swaps away from the browser, a system sheet/permission prompt steals
        focus, or the tab is backgrounded, all mid-pinch. Nothing above fires in that case, so
        activeTouches could get stuck > 0 forever and a window would be stranded in
        position:absolute pinch mode indefinitely. On regaining focus/visibility, there is no way
-       to know the real touch count, so treat it as "gesture over" unconditionally: reset
-       activeTouches to 0 and force a settle regardless of its previous value. */
-    const forceSettle = ()=>{ activeTouches = 0; clearTimeout(settleTimer); reclampAll(); pinchDbgUpdate(0); };
+       to know the real touch count OR the real zoom state, so treat it as "gesture over"
+       unconditionally and bypass the scale gate above on purpose: getting the window back to a
+       recoverable, interactive state takes priority over a smooth transition here. This can
+       still produce one visible jump if focus/visibility is lost while genuinely still zoomed
+       in -- a known, accepted gap (see the project doc) -- so log it distinctly from a normal
+       settle when that's what happened, to keep this rare recovery path distinguishable from
+       everyday behavior if it ever needs debugging. */
+    const forceSettle = ()=>{
+      activeTouches = 0;
+      clearTimeout(settleTimer);
+      const vv = window.visualViewport;
+      if(pinchActive && vv && vv.scale > SETTLE_SCALE_EPS){
+        console.warn('[pinchmode] forceSettle (blur/visibilitychange) restoring position:fixed while visualViewport.scale is still '
+          + vv.scale.toFixed(3) + ' -- rare interrupted-gesture recovery path, not a normal settle. A visible jump may occur.');
+      }
+      reclampAll();
+      pinchDbgUpdate(0);
+    };
     window.addEventListener('blur', forceSettle);
     document.addEventListener('visibilitychange', ()=>{ if(document.hidden) forceSettle(); });
   }
