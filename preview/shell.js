@@ -965,9 +965,14 @@ function buildDock(){
      systems are both trying to own the same one-finger gesture. */
   const pdbg = document.createElement('div');
   pdbg.id = 'peekdebug';
-  pdbg.style.cssText = 'position:fixed;top:4px;right:4px;z-index:99999;background:rgba(0,0,0,.75);'
+  /* 2026-10: moved from the right side to the left -- the dock lives at right:8px;top:50%,
+     and once the drag-stop trail (below) started keeping several events instead of one line,
+     this overlay grew tall enough to visually sit right on top of the docked panels on an
+     iPad-size screen. pointer-events:none means it was never actually blocking touch, but
+     "something is visibly covering the dock" is worth avoiding regardless. */
+  pdbg.style.cssText = 'position:fixed;top:4px;left:4px;z-index:99999;background:rgba(0,0,0,.75);'
     + 'color:#fff;font:11px/1.5 monospace;padding:5px 8px;border-radius:4px;pointer-events:none;'
-    + 'white-space:pre;transform:translateY(192px)';
+    + 'white-space:pre;max-width:280px;transform:translateY(192px)';
   document.body.appendChild(pdbg);
   let peekLog = 'no drag yet';
   /* Diagnostic (2026-10, iPad Pro "drag stops randomly" investigation): a single overwritten
@@ -978,7 +983,7 @@ function buildDock(){
   let dbgTrail = [];
   function pdbgUpdate(){
     dbgTrail.push(peekLog);
-    if(dbgTrail.length > 7) dbgTrail.shift();
+    if(dbgTrail.length > 4) dbgTrail.shift();   /* was 7 -- too tall on an iPad-size screen */
     pdbg.textContent = dbgTrail.join('\n----\n');
   }
   pdbgUpdate();
@@ -1034,15 +1039,12 @@ function buildDock(){
     const cap = h || w;
     w.classList.add('dragging'); try{ cap.setPointerCapture(e.pointerId); }catch(err){}
     const vv = window.visualViewport;
+    /* Trimmed 2026-10 from 5 lines to 2 -- same info content, just compact enough that a 4-entry
+       trail (above) doesn't turn this overlay into a screen-covering block on an iPad. */
     const fields = ev=>{
       const held = (()=>{ try{ return cap.hasPointerCapture(ev.pointerId); }catch(_){ return 'n/a'; } })();
-      return `pointerType=${ev.pointerType} id=${ev.pointerId}\n`
-        + `client=(${ev.clientX.toFixed(1)},${ev.clientY.toFixed(1)}) page=(${ev.pageX.toFixed(1)},${ev.pageY.toFixed(1)})\n`
-        + `vv: off=(${vv?vv.offsetLeft.toFixed(1):'n/a'},${vv?vv.offsetTop.toFixed(1):'n/a'}) `
-        + `size=(${vv?vv.width.toFixed(1):'n/a'}x${vv?vv.height.toFixed(1):'n/a'}) scale=${vv?vv.scale.toFixed(2):'n/a'}\n`
-        + `panel rect=(${w.getBoundingClientRect().left.toFixed(1)},${w.getBoundingClientRect().top.toFixed(1)}) `
-        + `pointerCapture held=${held}\n`
-        + `pageZoom active=${window.PZ?window.PZ.active:'n/a'}  NAV_ACTIVE=${window.NAV_ACTIVE}`;
+      return `${ev.pointerType}#${ev.pointerId} (${ev.clientX.toFixed(0)},${ev.clientY.toFixed(0)}) capture=${held}\n`
+        + `vv.scale=${vv?vv.scale.toFixed(2):'n/a'} PZ.active=${window.PZ?window.PZ.active:'n/a'}`;
     };
     peekLog = 'DOWN\n' + fields(e); pdbgUpdate();
     /* Gates the first write until real movement is seen (DRAG_MOVE_THRESHOLD, see its comment
@@ -2211,7 +2213,9 @@ if(window.visualViewport){
      does tick up (the engine is getting input; the bug is downstream of that). */
   const dbg = document.createElement('div');
   dbg.id = 'pzdebug';
-  dbg.style.cssText = 'position:fixed;top:4px;right:4px;z-index:99999;background:rgba(0,0,0,.75);'
+  /* 2026-10: moved to the left side, same reason as #peekdebug above -- keeps both debug
+     overlays off the right edge where the dock actually lives. */
+  dbg.style.cssText = 'position:fixed;top:4px;left:4px;z-index:99999;background:rgba(0,0,0,.75);'
     + 'color:#fff;font:11px/1.5 monospace;padding:5px 8px;border-radius:4px;pointer-events:none;white-space:pre';
   document.body.appendChild(dbg);
   let ctrlTicks = 0, plainTicks = 0, lastWheel = 'none yet', lastDrag = 'none yet';
