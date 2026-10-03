@@ -851,7 +851,7 @@ function buildDock(){
      as before (scrollend if it fires, the debounce otherwise). This doesn't change anything for
      non-touch input (trackpad/mouse never touch this gate — activeTouches stays 0 for them, so
      scheduleSettle behaves exactly as it did before this revision). */
-  if(window.visualViewport){
+  if(false && window.visualViewport){
     const FLOAT_SETTLE_DEBOUNCE = 150;
     let settleTimer = null, activeTouches = 0;
     const reclampAll = ()=>{
@@ -2021,7 +2021,7 @@ if(window.visualViewport){
    This is deliberately not wired up to the burger, the Frameworks bar, or the right dock
    yet beyond one line for the burger so it doesn't regress — see rawAuto() below. Those are
    the next step, once this engine itself is confirmed solid. */
-(function pageZoom(){
+(function pageZoom(){ return; /* DIAG: disabled */
   const wrap = document.querySelector('body > .wrap');
   if(!wrap) return;
   /* Two nested elements, not one, and this split is the fix for the "zoom breaks the page —

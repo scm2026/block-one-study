@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Diag B — position:absolute</title>
+<style>
+  html,body{margin:0;padding:0;font:16px -apple-system,sans-serif}
+  .workspace{position:relative; width:2400px;height:3000px;background:
+    repeating-linear-gradient(0deg,#eee,#eee 40px,#ddd 40px,#ddd 80px),
+    repeating-linear-gradient(90deg,#eee,#eee 40px,#ddd 40px,#ddd 80px);}
+  .panel{position:absolute; top:120px; left:120px; width:260px; height:180px;
+    background:#e0652b; color:#fff; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.3);
+    display:flex; align-items:center; justify-content:center; text-align:center; padding:12px;
+    box-sizing:border-box;}
+</style>
+</head>
+<body>
+  <div class="workspace">
+    <div class="panel">DIAG B<br>position: absolute<br>inside a plain, untransformed<br>workspace container<br>no JS at all</div>
+  </div>
+</body>
+</html>
