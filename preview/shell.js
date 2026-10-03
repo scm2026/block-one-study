@@ -832,18 +832,43 @@ function buildDock(){
          document scroll. Whichever of the two fires first wins; the other is simply a no-op
          once reclampAll() has already run (the debounce is cleared by the scrollend handler,
          and a stray extra reclampAll() after it is harmless since clampBox is idempotent on
-         an already-valid box). */
+         an already-valid box).
+
+     REVISED after real-device re-test: the debounce/scrollend settle above reduced the bounce
+     but didn't eliminate it. The gap: a real two-finger pinch is rarely one smooth continuous
+     motion — people pause mid-gesture (readjust grip, check the result, change direction)
+     without lifting their fingers. Any such pause longer than FLOAT_SETTLE_DEBOUNCE was being
+     read as "the gesture is over," so reclampAll() fired — and measured a still-live,
+     still-mid-pinch position — WHILE the fingers were still down and the gesture continued
+     right after. That's a real settle firing too early, not a bug in the settle logic itself.
+
+     The fix is a harder gate on top of the existing one: track how many touches are actually
+     on the glass (document-level touchstart/touchend/touchcancel, which is the one unambiguous
+     signal that a pinch is still physically in progress, independent of event timing). While
+     any touch is active, scheduleSettle() is a no-op outright — no timer is even started, so a
+     mid-gesture pause of any length can no longer trigger a premature reclamp. The moment the
+     last finger lifts (touchend/touchcancel bringing the count to 0), settling proceeds exactly
+     as before (scrollend if it fires, the debounce otherwise). This doesn't change anything for
+     non-touch input (trackpad/mouse never touch this gate — activeTouches stays 0 for them, so
+     scheduleSettle behaves exactly as it did before this revision). */
   if(window.visualViewport){
     const FLOAT_SETTLE_DEBOUNCE = 150;
-    let settleTimer = null;
+    let settleTimer = null, activeTouches = 0;
     const reclampAll = ()=>{
       document.querySelectorAll('.peek.float').forEach(w=>{ const r = w.getBoundingClientRect(); clampBox(w, r.left, r.top, r.width, r.height); });
     };
-    const scheduleSettle = ()=>{ clearTimeout(settleTimer); settleTimer = setTimeout(reclampAll, FLOAT_SETTLE_DEBOUNCE); };
+    const scheduleSettle = ()=>{
+      clearTimeout(settleTimer);
+      if(activeTouches > 0) return;   /* a finger is still on the glass -- the gesture isn't over, don't settle yet */
+      settleTimer = setTimeout(reclampAll, FLOAT_SETTLE_DEBOUNCE);
+    };
+    document.addEventListener('touchstart', e=>{ activeTouches = e.touches.length; clearTimeout(settleTimer); }, {passive:true});
+    document.addEventListener('touchend', e=>{ activeTouches = e.touches.length; if(activeTouches === 0) scheduleSettle(); }, {passive:true});
+    document.addEventListener('touchcancel', e=>{ activeTouches = e.touches.length; if(activeTouches === 0) scheduleSettle(); }, {passive:true});
     window.visualViewport.addEventListener('resize', scheduleSettle);
     window.visualViewport.addEventListener('scroll', scheduleSettle);
     if('onscrollend' in window){
-      document.addEventListener('scrollend', ()=>{ clearTimeout(settleTimer); reclampAll(); });
+      document.addEventListener('scrollend', ()=>{ if(activeTouches === 0){ clearTimeout(settleTimer); reclampAll(); } });
     }
   }
   let zTop = 60; const raise = w=>{ w.style.zIndex = ++zTop; };
