@@ -2312,7 +2312,56 @@ if(window.visualViewport){
     tx = Math.min(vw / k, Math.max(-cw, tx));
     ty = Math.min(vh / k, Math.max(-ch, ty));
   }
+  /* ===== TEMP DIAGNOSTIC, preview-only -- remove after the frame-timing investigation (2026-10)
+     =====
+     Tests the "GPU layer-promotion flash" theory for the still-reported first-pinch jump: the
+     pre-engage timing fix made the JS-side state (position/transform) provably correct before
+     any finger movement, but the on-device jump persisted anyway -- which points at something
+     the DOM/style state can't show: the browser doing one-time compositing-layer setup work
+     the first time #pagezoom gets position:fixed + a transform, independent of how correct
+     that transform's VALUE is. This does nothing but measure: for every engage() this page
+     load, it times ~600ms of animation frames afterward and reports the slowest one, so a
+     distinct one-time stall at/near the first engage (and not at later ones) would support the
+     theory; no stall anywhere would argue against it. Zero effect on zoom/pan behavior. */
+  let engageCount = 0;
+  const frameTimingLog = [];
+  const ftOverlay = document.createElement('div');
+  ftOverlay.id = 'frametiming';
+  ftOverlay.style.cssText = 'position:fixed;bottom:4px;left:4px;z-index:99999;'
+    + 'background:rgba(0,70,0,.82);color:#fff;font:10px/1.4 monospace;padding:5px 8px;'
+    + 'border-radius:4px;pointer-events:none;white-space:pre;max-width:360px';
+  document.body.appendChild(ftOverlay);
+  function renderFrameTimingOverlay(){
+    ftOverlay.textContent = 'FRAME TIMING PROBE (temp, preview-only)\n' + frameTimingLog.join('\n');
+  }
+  renderFrameTimingOverlay();
+  function startFrameTimingProbe(){
+    engageCount++;
+    const engageN = engageCount;
+    const startedAt = performance.now();
+    let lastFrameAt = startedAt;
+    const frames = [];
+    const SAMPLE_MS = 600;
+    function tick(now){
+      const delta = now - lastFrameAt;
+      frames.push(delta);
+      lastFrameAt = now;
+      if(now - startedAt < SAMPLE_MS){
+        requestAnimationFrame(tick);
+      } else {
+        const maxDelta = Math.max(...frames);
+        const maxIdx = frames.indexOf(maxDelta);
+        frameTimingLog.push(`engage #${engageN}: ${frames.length}f sampled, slowest=${maxDelta.toFixed(1)}ms @f#${maxIdx}`);
+        if(frameTimingLog.length > 6) frameTimingLog.shift();
+        renderFrameTimingOverlay();
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+  /* ===== end TEMP DIAGNOSTIC ===== */
+
   function engage(){
+    startFrameTimingProbe();  /* TEMP DIAGNOSTIC -- see block above */
     active = true;
     tx = -window.scrollX; ty = -window.scrollY;
     pz.style.position = 'fixed'; pz.style.inset = '0'; pz.style.overflow = 'hidden';
