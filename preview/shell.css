@@ -684,7 +684,13 @@ tspan.term{border-bottom:0; text-decoration:underline dotted; text-decoration-th
 .peek #factcard, .peek .card{margin:0; border:0; box-shadow:none; background:transparent; padding:0}
 .peek #tree{display:block; width:100%; height:auto}
 .peek:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
-@media(max-width:1099px){
+/* Breakpoint lowered from 1099px to 1023px (2026-10), matched to shell.js's narrow() --
+   see the comment there for why (the iPad mini's 1024px landscape viewport needs to clear
+   this to get the normal docked/floating treatment instead of this static-card fallback).
+   This pair must stay in sync with narrow() in shell.js; do not change one without the other.
+   Separate from, and not to be confused with, the 1099/1100px pair elsewhere in this file that
+   governs the step-rail-vs-sticky-bar layout -- a different feature, left untouched. */
+@media(max-width:1023px){
   #dock{position:static; transform:none; margin:16px; max-height:none; align-items:stretch}
   .peek, .peek.open{width:auto} .peek .pbody, .peek.open .pbody{max-height:none; overflow:visible; padding:4px 12px 12px}
   .peek .pclose{display:none !important}
@@ -693,4 +699,4 @@ tspan.term{border-bottom:0; text-decoration:underline dotted; text-decoration-th
 }
 /* the dock header already says "Notes so far" and the count; the card's own title row would repeat it */
 .peek #factcard > details > summary{display:none}
-@media(max-width:1099px){ .peek #factcard > details > summary{display:flex} }
+@media(max-width:1023px){ .peek #factcard > details > summary{display:flex} }

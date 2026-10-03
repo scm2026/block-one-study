@@ -773,7 +773,21 @@ function buildDock(){
   };
   const pt = mk('peekTree', 'Framework tree', [tree, cap]), pn = mk('peekNotes', 'Notes so far', [fact]);
   dock.append(pt, pn); document.body.appendChild(dock);
-  const narrow = ()=>window.matchMedia('(max-width:1099px)').matches;
+  /* Breakpoint lowered from 1099px to 1023px (2026-10): the iPad mini's Safari viewport is
+     768px wide in portrait and 1024px in landscape -- both were under the old 1099px threshold,
+     so the mini always got the narrow (static inline card) fallback below, in every orientation,
+     while the iPad Pro's larger landscape viewport cleared it and got the normal docked/floating
+     treatment. Moving the line to 1023px admits any viewport >=1024px (the mini's landscape
+     width, and up) into the full dock/floating experience; the mini in portrait (768px) still
+     falls under the line and keeps the static-card layout, which is the deliberate tradeoff —
+     floated windows need real room (380-660px wide) that a 768px-wide screen doesn't comfortably
+     have. This is a general breakpoint change, not a mini-specific hack, so it also affects any
+     other viewport in the 1024-1099px band (e.g. a split-screen view on a larger iPad, or a
+     resized desktop browser window) the same way. The matching CSS rules are in shell.css (search
+     for "1023px" there) -- the two must move together or the JS and CSS fallback thresholds
+     disagree. NOT touched: the separate 1099/1100px pair governing the step-rail-vs-sticky-bar
+     layout (shell.css, a different feature) -- this change is scoped to the dock only. */
+  const narrow = ()=>window.matchMedia('(max-width:1023px)').matches;
   /* Same visualViewport pattern already proven in buildRailToggle (the burger) and
      fwPlace/fwTipFollow (the term tooltip): position:fixed anchors to the LAYOUT viewport,
      not the visible one, and raw innerWidth/innerHeight describe the layout viewport too —
@@ -941,8 +955,17 @@ function buildDock(){
     const FLOAT_SETTLE_DEBOUNCE = 150;
     /* Tolerance for "back at native-zoom baseline". visualViewport.scale is never exactly 1.000
        at rest on every device/browser combo (sub-pixel/float noise), so treat anything within
-       this band of 1 as settled rather than requiring an exact match. */
-    const SETTLE_SCALE_EPS = 1.02;
+       this band of 1 as settled rather than requiring an exact match.
+       SYMMETRIC, not one-sided: a zoom-OUT past the floor produces a native rubber-band/elastic
+       overshoot where scale briefly dips BELOW 1 before the browser animates it back up -- a real
+       device report showed the windows jumping every time during that snap-back. The original
+       one-sided check (scale > baseline + tolerance) only ever caught the zoom-IN case and let a
+       fingers-lifted-mid-undershoot moment read as "close enough to baseline," switching back to
+       position:fixed while that snap-back animation was still live and re-exposing the exact
+       WebKit fixed-during-live-zoom desync (Section 2f/4.9) for its remaining duration. Measuring
+       the deviation with Math.abs() catches both directions with the same one tolerance. */
+    const SETTLE_SCALE_TOLERANCE = 0.02;
+    const atZoomBaseline = vv => !vv || Math.abs(vv.scale - 1) <= SETTLE_SCALE_TOLERANCE;
     let settleTimer = null, activeTouches = 0;
     const reclampAll = ()=>{
       fromPinchMode();
@@ -969,7 +992,7 @@ function buildDock(){
     const maybeSettle = ()=>{
       if(activeTouches > 0) return;   /* a finger is still on the glass -- the gesture isn't over, don't settle yet */
       const vv = window.visualViewport;
-      if(pinchActive && vv && vv.scale > SETTLE_SCALE_EPS){
+      if(pinchActive && !atZoomBaseline(vv)){
         pinchDbgUpdate(activeTouches);   /* reflect the "waiting for baseline" state in the overlay, but write nothing to the windows */
         return;
       }
@@ -1010,7 +1033,7 @@ function buildDock(){
       activeTouches = 0;
       clearTimeout(settleTimer);
       const vv = window.visualViewport;
-      if(pinchActive && vv && vv.scale > SETTLE_SCALE_EPS){
+      if(pinchActive && !atZoomBaseline(vv)){
         console.warn('[pinchmode] forceSettle (blur/visibilitychange) restoring position:fixed while visualViewport.scale is still '
           + vv.scale.toFixed(3) + ' -- rare interrupted-gesture recovery path, not a normal settle. A visible jump may occur.');
       }
@@ -1128,6 +1151,24 @@ function buildDock(){
   function pdbgUpdate(){ pdbg.textContent = peekLog; }
   pdbgUpdate();
   document.addEventListener('pointerdown', e=>{
+    /* Found via a real-device report: a plain TAP (no real movement needed) on a floated
+       window that's currently in pinch mode (position:absolute, document-relative left/top)
+       could still jump it somewhere arbitrary. The drag math below (s.L/s.T captured from
+       getBoundingClientRect(), a LAYOUT-viewport-relative read, then combined with clientX/Y
+       deltas and handed to clampBox(), which writes style.left/top as if the window were
+       position:fixed) is correct for fixed but wrong for absolute: a fixed window's left/top
+       live in the same frame as clientX/Y, so the delta math is self-consistent; an absolute
+       window's left/top are DOCUMENT-relative, a different frame, related to the layout-viewport
+       frame only by however far the page is currently panned. At low pan distance that gap is
+       negligible; at real pan distance (the window only partially visible, i.e. the exact report)
+       it's large, and even a near-zero-movement pointermove tick -- which fires on a plain tap,
+       not just a deliberate drag -- writes a wildly wrong position using it. Floated windows were
+       never meant to be draggable mid-pinch in the first place (the accepted tradeoff from the
+       original design, Section 2f, is that a window rides along with the document while pinch
+       mode is active) -- so the fix is the same shape as the Section 2g resize-handler fix: this
+       whole handler does nothing while pinchActive, rather than trying to make the drag math
+       itself position-mode-aware. */
+    if(pinchActive) return;
     let w = e.target.closest && e.target.closest('.peek.float');
     if(!w){
       /* TOUCH ONLY: float a still-docked window on the SAME touch that then drags it, instead
