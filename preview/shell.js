@@ -809,6 +809,24 @@ function buildDock(){
     W = Math.max(PEEK_MIN_W, Math.min(W, vb.W)); H = Math.max(PEEK_MIN_H, Math.min(H, vb.H));
     L = Math.min(Math.max(L, vb.L + PEEK_KEEP - W), vb.L + vb.W - PEEK_KEEP);
     T = Math.min(Math.max(T, vb.T), vb.T + vb.H - 34);
+    /* L/T above are LAYOUT-viewport-relative ("screen") coordinates -- the same frame as
+       getBoundingClientRect()/clientX,Y, which is what every caller passes in and what
+       vvBounds() clamps against. That's the correct frame to write directly into
+       style.left/top for a position:fixed window (every other caller of clampBox only ever
+       runs while a window is fixed). A window currently in pinch mode (position:absolute,
+       flagged by data-pinchAbs -- see toPinchMode()) needs DOCUMENT-relative coordinates
+       instead -- the exact same conversion toPinchMode() itself uses at gesture start,
+       applied here too since v10's "disable dragging entirely during pinch" fix is being
+       replaced with "convert the coordinates correctly instead" (Section 2m/4.15): a live
+       drag on a partially-visible window during an active pinch needs its delta written in
+       document-relative terms, or it lands roughly as far off as the page is currently
+       panned -- the same math error v10's blanket guard sidestepped by disabling dragging
+       altogether, which also broke legitimate dragging while zoomed in. */
+    if(w.dataset.pinchAbs){
+      const vv = window.visualViewport;
+      L += vv ? (vv.pageLeft - vv.offsetLeft) : window.scrollX;
+      T += vv ? (vv.pageTop  - vv.offsetTop)  : window.scrollY;
+    }
     w.style.left = L + 'px'; w.style.top = T + 'px'; w.style.width = W + 'px'; w.style.height = H + 'px';
   };
   /* Keep floated windows inside the visible window as it pans during a pinch-zoom, even
@@ -907,6 +925,31 @@ function buildDock(){
     pinchDbg.textContent = `touches=${touchCount} pinchActive=${pinchActive} scale=${scaleStr}\n${wins || '  (no floated windows)'}`;
   }
   let pinchActive = false;
+  /* GESTURE-OWNERSHIP PRECEDENCE, added for Section 2m/4.15: a native multi-touch pinch must
+     always win over a single-finger window drag that happened to start first. The dock's
+     pointerdown handler (below) sets the 'dragging' class on a window the instant a finger
+     touches its blank space -- before any movement, let alone a second finger -- and
+     toPinchMode() (above) deliberately skips any window still carrying 'dragging', on the
+     theory that a window mid-drag shouldn't have its geometry swapped out from under the
+     user (Section 2f). That protection backfires when the "drag" was never more than a
+     first finger landing right as a second one arrives to start a real pinch: the window
+     gets stuck excluded from pinch-mode and stays position:fixed for the whole gesture,
+     reproducing the WebKit fixed-during-live-pinch jitter (Section 2f/4.9) for exactly that
+     window. activeDrag holds a cancel callback for whatever single-pointer drag/resize is
+     currently provisional (set by the pointerdown handler below, cleared on its own
+     pointerup/pointercancel); the touchstart listener calls it the instant a second finger
+     is detected, BEFORE toPinchMode() runs, so the window is never still 'dragging' by the
+     time toPinchMode() decides whether to skip it. */
+  let activeDrag = null;
+  const cancelActiveDrag = ()=>{ if(activeDrag){ const c = activeDrag; activeDrag = null; c(); } };
+  /* Hoisted out of the `if(window.visualViewport){...}` block below (which still owns all the
+     settle logic that reads/writes it) so the pointerdown handler further down -- outside that
+     block -- can read the live touch count too, to tell "a real multi-touch pinch is physically
+     in progress right now" apart from "pinchActive is true", which can stay true long after
+     fingers lift (any time the page is still zoomed away from baseline -- see atZoomBaseline).
+     Dragging must be allowed in the latter case (that's the whole point of Section 2m/4.15) and
+     refused only in the former. */
+  let activeTouches = 0;
   pinchDbgUpdate(0);
   const toPinchMode = ()=>{
     if(pinchActive) return;
@@ -966,7 +1009,7 @@ function buildDock(){
        the deviation with Math.abs() catches both directions with the same one tolerance. */
     const SETTLE_SCALE_TOLERANCE = 0.02;
     const atZoomBaseline = vv => !vv || Math.abs(vv.scale - 1) <= SETTLE_SCALE_TOLERANCE;
-    let settleTimer = null, activeTouches = 0;
+    let settleTimer = null;
     const reclampAll = ()=>{
       fromPinchMode();
       document.querySelectorAll('.peek.float').forEach(w=>{ const r = w.getBoundingClientRect(); clampBox(w, r.left, r.top, r.width, r.height); });
@@ -1006,7 +1049,10 @@ function buildDock(){
     document.addEventListener('touchstart', e=>{
       activeTouches = e.touches.length;
       clearTimeout(settleTimer);
-      if(activeTouches >= 2) toPinchMode();   /* two fingers down is the one unambiguous "native pinch may be starting" signal */
+      if(activeTouches >= 2){
+        cancelActiveDrag();   /* release any provisional one-finger drag FIRST, so toPinchMode() below never sees a stale 'dragging' class and skips this window -- see the activeDrag comment above */
+        toPinchMode();   /* two fingers down is the one unambiguous "native pinch may be starting" signal */
+      }
       pinchDbgUpdate(activeTouches);
     }, {passive:true});
     document.addEventListener('touchmove', e=>{ pinchDbgUpdate(e.touches.length); }, {passive:true});
@@ -1150,25 +1196,31 @@ function buildDock(){
   let peekLog = 'no drag yet';
   function pdbgUpdate(){ pdbg.textContent = peekLog; }
   pdbgUpdate();
+  /* Minimum pointer movement, in CSS px, before a pointerdown-then-move counts as a real drag
+     rather than a tap. Section 2i (v10) found that a plain tap on a partially-visible floated
+     window during pinch mode could still jump it -- caused by clampBox() writing a
+     layout-viewport-relative delta into a document-relative style.left/top for an absolute
+     (pinch-mode) window, even on a near-zero movement (a real tap's own sub-pixel jitter was
+     enough to trigger it, confirmed at (0.3, 0.2)px in pinchmode_taponly_test.js). v10 fixed
+     that by disabling the whole drag handler during pinch mode -- which also broke legitimate
+     dragging of a partially-visible window while genuinely zoomed in (a real-device report
+     this round: "touch the blank space and try to drag -- nothing happens at all"). Section
+     2m/4.15 replaces that blanket disable with the actual fix: clampBox() itself now converts
+     to document-relative coordinates when the window is in pinch mode (see clampBox above), so
+     the geometry it writes is correct either way. This threshold is a second, independent
+     safeguard -- belt and braces, not a workaround for a remaining gap -- so an accidental tap
+     still writes nothing at all rather than relying solely on the coordinate math being right. */
+  const DRAG_MOVE_THRESHOLD = 4;
   document.addEventListener('pointerdown', e=>{
-    /* Found via a real-device report: a plain TAP (no real movement needed) on a floated
-       window that's currently in pinch mode (position:absolute, document-relative left/top)
-       could still jump it somewhere arbitrary. The drag math below (s.L/s.T captured from
-       getBoundingClientRect(), a LAYOUT-viewport-relative read, then combined with clientX/Y
-       deltas and handed to clampBox(), which writes style.left/top as if the window were
-       position:fixed) is correct for fixed but wrong for absolute: a fixed window's left/top
-       live in the same frame as clientX/Y, so the delta math is self-consistent; an absolute
-       window's left/top are DOCUMENT-relative, a different frame, related to the layout-viewport
-       frame only by however far the page is currently panned. At low pan distance that gap is
-       negligible; at real pan distance (the window only partially visible, i.e. the exact report)
-       it's large, and even a near-zero-movement pointermove tick -- which fires on a plain tap,
-       not just a deliberate drag -- writes a wildly wrong position using it. Floated windows were
-       never meant to be draggable mid-pinch in the first place (the accepted tradeoff from the
-       original design, Section 2f, is that a window rides along with the document while pinch
-       mode is active) -- so the fix is the same shape as the Section 2g resize-handler fix: this
-       whole handler does nothing while pinchActive, rather than trying to make the drag math
-       itself position-mode-aware. */
-    if(pinchActive) return;
+    /* A real multi-touch pinch must always win over a single-finger drag that happened to grab
+       a window first -- see the activeDrag/cancelActiveDrag comment near pinchActive above.
+       Note this is NOT `if(pinchActive) return` (that was v10's blanket guard, removed here):
+       pinchActive stays true for as long as the page is genuinely zoomed away from baseline,
+       including long after fingers lift, and dragging a partially-visible window during that
+       window is exactly the behavior this fix restores. activeTouches is the narrower, correct
+       signal -- "a pinch is physically happening on the glass right now". */
+    if(activeTouches >= 2) return;
+    if(activeDrag) return;   /* a drag/resize is already provisional from another pointer; don't start a second, overlapping one */
     let w = e.target.closest && e.target.closest('.peek.float');
     if(!w){
       /* TOUCH ONLY: float a still-docked window on the SAME touch that then drags it, instead
@@ -1209,8 +1261,21 @@ function buildDock(){
         + `pageZoom active=${window.PZ?window.PZ.active:'n/a'}  NAV_ACTIVE=${window.NAV_ACTIVE}`;
     };
     peekLog = 'DOWN\n' + fields(e); pdbgUpdate();
+    /* Gates the first write until real movement is seen (DRAG_MOVE_THRESHOLD, see its comment
+       above) -- a plain tap writes nothing at all, not even a correctly-converted no-op write.
+       Once crossed, dragStarted latches true for the rest of this gesture so there's no
+       re-arming mid-drag if the pointer happens to pause and the next tick's dx/dy momentarily
+       looks small again. */
+    let dragStarted = false;
     const mv = ev=>{
       const dx = ev.clientX - s.x, dy = ev.clientY - s.y;
+      if(!dragStarted){
+        if(Math.hypot(dx, dy) < DRAG_MOVE_THRESHOLD){
+          peekLog = `MOVE (below threshold, no write) dx=${dx.toFixed(1)} dy=${dy.toFixed(1)}\n` + fields(ev); pdbgUpdate();
+          return;
+        }
+        dragStarted = true;
+      }
       peekLog = `MOVE dx=${dx.toFixed(1)} dy=${dy.toFixed(1)}\n` + fields(ev); pdbgUpdate();
       if(!dir){ clampBox(w, s.L + dx, s.T + dy, s.W, s.H); return; }
       let L = s.L, T = s.T, W = s.W, H = s.H;
@@ -1220,16 +1285,32 @@ function buildDock(){
       if(dir.includes('n')){ H = Math.max(PEEK_MIN_H, s.H - dy); T = s.T + (s.H - H); }
       clampBox(w, L, T, W, H);
     };
-    const up = ev=>{
-      peekLog = `UP(${ev.type})\n` + fields(ev); pdbgUpdate();
+    const teardown = ()=>{
       w.classList.remove('dragging');
       document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up);
       document.removeEventListener('pointercancel', up); cap.removeEventListener('lostpointercapture', lost);
+      if(activeDrag === cancel) activeDrag = null;
+    };
+    const up = ev=>{
+      peekLog = `UP(${ev.type})\n` + fields(ev); pdbgUpdate();
+      teardown();
     };
     const lost = ev=>{
       peekLog = `LOST CAPTURE (no up/cancel seen) — browser likely took the gesture\n` + fields(ev); pdbgUpdate();
       up(ev);
     };
+    /* Cancel path for cancelActiveDrag() (called from the touchstart listener the instant a
+       second finger is detected -- see that comment): tears down exactly like a normal
+       pointerup/cancel, releases capture, but writes no further geometry. Whatever position the
+       window is already at (mid-drag or not) is left as-is; toPinchMode(), which runs right
+       after this in the touchstart handler, picks it up from there via its own
+       getBoundingClientRect() read. */
+    const cancel = ()=>{
+      try{ cap.releasePointerCapture(e.pointerId); }catch(err){}
+      peekLog = 'CANCELLED (multi-touch pinch started)\n' + fields(e); pdbgUpdate();
+      teardown();
+    };
+    activeDrag = cancel;
     document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up);
     document.addEventListener('pointercancel', up); cap.addEventListener('lostpointercapture', lost);
   });
