@@ -873,9 +873,14 @@ function buildDock(){
      the other three. */
   const pinchDbg = document.createElement('div');
   pinchDbg.id = 'pinchdebug';
-  pinchDbg.style.cssText = 'position:fixed;top:4px;right:4px;z-index:99999;background:rgba(0,0,0,.75);'
+  /* Deliberately placed in the OPPOSITE corner from the other three stacked overlays, not
+     stacked below them: #peekdebug in particular grows taller than its allotted gap during an
+     active drag (it logs a growing multi-line pointer trace), so a fourth box stacked beneath
+     it by a fixed offset gets silently covered whenever a drag is in progress -- exactly what
+     was reported. Top-left has nothing else on it. */
+  pinchDbg.style.cssText = 'position:fixed;top:4px;left:4px;z-index:99999;background:rgba(0,0,0,.75);'
     + 'color:#0f0;font:11px/1.5 monospace;padding:5px 8px;border-radius:4px;pointer-events:none;'
-    + 'white-space:pre;transform:translateY(260px)';
+    + 'white-space:pre';
   document.body.appendChild(pinchDbg);
   function pinchDbgUpdate(touchCount){
     const wins = Array.from(document.querySelectorAll('.peek.float')).map((w,i)=>{
