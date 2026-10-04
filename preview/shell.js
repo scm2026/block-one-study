@@ -2600,6 +2600,7 @@ if(window.visualViewport){
       sl: xEl ? xEl.scrollLeft : window.scrollX,
       st: yEl ? yEl.scrollTop  : window.scrollY,
       tx0: tx, ty0: ty,
+      touch: e.pointerType === 'touch', samples: [{t:e.timeStamp, x:e.clientX, y:e.clientY}],
       slop: touchOwned ? TOUCH_SLOP : 4,   /* only the newly-allowed touch case gets the wider tap slop */
       swallow: touchOwned                  /* ...and only it needs the end-of-drag click swallowed */
     };
@@ -2626,6 +2627,10 @@ if(window.visualViewport){
     }
     if(window.NAV_MARK) window.NAV_MARK();   /* a click-drag pan has no wheel/scroll events of its own */
     e.preventDefault();
+    if(pend.touch){                           /* release-glide velocity: keep only the last ~100ms */
+      const sm = pend.samples; sm.push({t:e.timeStamp, x:e.clientX, y:e.clientY});
+      while(sm.length > 2 && e.timeStamp - sm[0].t > 100) sm.shift();
+    }
     if(pend.xEl) pend.xEl.scrollLeft = pend.sl - dx;
     if(pend.yEl) pend.yEl.scrollTop  = pend.st - dy;
     if(active){
@@ -2659,6 +2664,50 @@ if(window.visualViewport){
        window to be swallowed, then stand down so no later tap is ever affected. */
     if(swallowClick){ clearTimeout(swallowTimer); swallowTimer = setTimeout(()=>{ swallowClick = false; }, 400); }
   };
+  /* ---- release glide (touch, zoomed, one finger) --------------------------------------------
+     At rest the browser scrolls natively and adds its own momentum; once zoomed the page is
+     panned by this code, which used to stop dead the instant the finger lifted. On a clean
+     pointerup of a touch pan, keep moving at the release velocity (last ~100ms of movement)
+     and decay it the way iOS does (0.998 per ms). No glide if the finger rested >80ms before
+     lifting, or if the release is slow. Cancelled by: any new pointerdown/wheel (a second
+     finger = a pinch, a touch = catch), losing zoom, and each axis stops at its edge.
+     pointercancel / blur / PZ_CANCEL_PAN never glide (they call end() directly). */
+  let glide = null;
+  function stopGlide(){ glide = null; }
+  window.PZ_GLIDING = ()=> !!glide;
+  function glideFrame(now){
+    if(!glide) return;
+    if(!active){ glide = null; return; }
+    const dt = Math.min(48, now - glide.t); glide.t = now;
+    const dec = Math.pow(0.998, dt);
+    glide.vx *= dec; glide.vy *= dec;
+    const ox = tx, oy = ty;
+    if(glide.vx) tx += glide.vx * dt / k;
+    if(glide.vy) ty += glide.vy * dt / k;
+    const ix = tx, iy = ty;
+    clampPan();
+    if(tx !== ix) glide.vx = 0;                /* hit an edge: this axis stops, the other carries on */
+    if(ty !== iy) glide.vy = 0;
+    if(tx !== ox || ty !== oy){ applyTransformNow(); if(window.NAV_MARK) window.NAV_MARK(); }
+    if(Math.hypot(glide.vx, glide.vy) < 0.02){ glide = null; return; }
+    requestAnimationFrame(glideFrame);
+  }
+  function startGlide(e){
+    if(!pend || !pend.started || !pend.touch || !active || e.pointerId !== pend.id) return;
+    if(pend.xEl || pend.yEl) return;           /* an inner scroller is being driven, not the page */
+    const sm = pend.samples; if(sm.length < 2) return;
+    const last = sm[sm.length - 1], first = sm[0];
+    if(e.timeStamp - last.t > 80) return;       /* paused before lifting: stay put */
+    const span = last.t - first.t; if(span < 8) return;
+    let vx = (last.x - first.x) / span, vy = (last.y - first.y) / span;
+    const sp = Math.hypot(vx, vy); if(sp < 0.15) return;   /* slow drag: no fling */
+    const cap = 6; if(sp > cap){ vx *= cap / sp; vy *= cap / sp; }
+    glide = { vx, vy, t: performance.now() };
+    requestAnimationFrame(glideFrame);
+  }
+  window.addEventListener('pointerup', startGlide);
+  document.addEventListener('pointerdown', stopGlide, true);
+  window.addEventListener('wheel', stopGlide, {capture:true, passive:true});
   window.addEventListener('pointerup', end);
   window.addEventListener('pointercancel', end);
   window.addEventListener('blur', end);
