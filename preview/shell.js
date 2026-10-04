@@ -644,7 +644,12 @@ function buildRailToggle(){
      exact where it applies, unlike the three signals above which are all indirect
      guesses. Checked defensively since this runs before pageZoom's script has executed
      on first load. */
-  function rawAuto(){ return window.innerWidth < BREAK || autoZoomedIn() || gestureZoomedIn || !!(window.PZ && window.PZ.active); }
+  /* 2026-10 (jump fix): the app's own zoom (window.PZ.active) deliberately does NOT collapse the rail any more.
+     Collapsing it re-flows the body card (grid-column:1/-1: 1002px -> 1168px wide, text re-wraps) in the middle of
+     a pinch, up to ~400ms after the second finger lands (this poll) -- that was the visible "jump". Our zoom
+     scales the real layout, so the rail simply scales and pans with the page; collapsing is only for Safari's
+     native/browser zoom, which changes the layout viewport (the three signals below). */
+  function rawAuto(){ return window.innerWidth < BREAK || autoZoomedIn() || gestureZoomedIn; }
   function sync(){
     const raw = rawAuto();
     if(lastRawAuto !== null && raw !== lastRawAuto) manualOverride = null; /* real change: auto takes back over */
@@ -2354,7 +2359,7 @@ if(window.visualViewport){
       + `style.transform: ${actualT || '(empty)'}  ${matches ? 'MATCHES state' : 'MISMATCH vs state'}\n`
       + `computed: ${compT}  pz.pos=${getComputedStyle(pz).position}\n`
       + `layer w measured=${lr.width.toFixed(0)} expected=${(layer.offsetWidth * (active ? k : 1)).toFixed(0)}  paintPending=${needsPaint}`;
-    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + 'JUMP DIAG (jd1):\n' + (jdTrail.length ? jdTrail.join('\n') : '(none)') + '\n' + `PINCH DIAG  build=jd3  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
+    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + 'JUMP DIAG (jd1):\n' + (jdTrail.length ? jdTrail.join('\n') : '(none)') + '\n' + `PINCH DIAG  build=rail1  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
       + ((window.PZ_PINCH_DIAG && window.PZ_PINCH_DIAG().tp) ? window.PZ_PINCH_DIAG().tp() : '')
       + pinchDiagText();
   }
