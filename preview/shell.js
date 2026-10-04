@@ -2258,12 +2258,29 @@ if(window.visualViewport){
   }
   function requestPaint(){ needsPaint = true; scheduleFrame(); }
   function renderDebug(){
+    /* TEMP DIAGNOSTIC (2026-10, preview-only): the last three lines exist to tell a JS-side lost
+       write apart from a compositor/presentation problem when the readout says zoomed but the
+       screen shows normal size. Remove with the frame-timing probe. */
+    const actualT = layer.style.transform;
+    const compT = getComputedStyle(layer).transform;
+    /* numeric, not string, comparison: the browser re-serialises numbers (rounds digits), so a
+       string compare reports false mismatches. Computed matrix is (k,0,0,k,tx*k,ty*k). */
+    let matches;
+    if(!active) matches = (compT === 'none');
+    else {
+      const m = (compT.match(/-?[\d.]+(?:e-?\d+)?/g) || []).map(Number);
+      matches = m.length === 6 && Math.abs(m[0] - k) < 0.01 && Math.abs(m[4] - tx * k) < 1 && Math.abs(m[5] - ty * k) < 1;
+    }
+    const lr = layer.getBoundingClientRect();
     dbg.textContent = `zoom ${k.toFixed(2)}x · ${active ? 'CONTROLLED' : 'native'}\n`
       + `tx=${tx.toFixed(1)}  ty=${ty.toFixed(1)}\n`
       + `window.scrollX=${window.scrollX}  scrollY=${window.scrollY}\n`
       + `ctrl-wheel ticks: ${ctrlTicks}  plain-wheel ticks: ${plainTicks}\n`
       + `last wheel: ${lastWheel}\n`
-      + `last drag: ${lastDrag}`;
+      + `last drag: ${lastDrag}\n`
+      + `style.transform: ${actualT || '(empty)'}  ${matches ? 'MATCHES state' : 'MISMATCH vs state'}\n`
+      + `computed: ${compT}  pz.pos=${getComputedStyle(pz).position}\n`
+      + `layer w measured=${lr.width.toFixed(0)} expected=${(layer.offsetWidth * (active ? k : 1)).toFixed(0)}  paintPending=${needsPaint}`;
   }
   /* Kept as the name every existing call site already uses -- now a cheap flag-set instead of
      an immediate string build + DOM write. Per-event callers (the wheel/drag handlers below)
