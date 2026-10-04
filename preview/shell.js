@@ -1,3 +1,10 @@
+/* Diagnostics switch (preview): the debug boxes are hidden unless html.diag is set. Turn on with ?diag=1 on the
+   URL (it sticks in this browser), turn off with ?diag=0. */
+try{
+  if(/[?&]diag=1\b/.test(location.search)) localStorage.setItem('blockDiag', '1');
+  if(/[?&]diag=0\b/.test(location.search)) localStorage.removeItem('blockDiag');
+  if(localStorage.getItem('blockDiag') === '1') document.documentElement.classList.add('diag');
+}catch(err){}
 /* shell.js — one copy, shared by every block.
    Built by merge_shell.py from three drifted variants; every former
    difference is now driven by the data, not by which page it sits in. */
@@ -2359,7 +2366,7 @@ if(window.visualViewport){
       + `style.transform: ${actualT || '(empty)'}  ${matches ? 'MATCHES state' : 'MISMATCH vs state'}\n`
       + `computed: ${compT}  pz.pos=${getComputedStyle(pz).position}\n`
       + `layer w measured=${lr.width.toFixed(0)} expected=${(layer.offsetWidth * (active ? k : 1)).toFixed(0)}  paintPending=${needsPaint}`;
-    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + 'JUMP DIAG (jd1):\n' + (jdTrail.length ? jdTrail.join('\n') : '(none)') + '\n' + `PINCH DIAG  build=rail1  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
+    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + 'JUMP DIAG (jd1):\n' + (jdTrail.length ? jdTrail.join('\n') : '(none)') + '\n' + `PINCH DIAG  build=nodiag1  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
       + ((window.PZ_PINCH_DIAG && window.PZ_PINCH_DIAG().tp) ? window.PZ_PINCH_DIAG().tp() : '')
       + pinchDiagText();
   }

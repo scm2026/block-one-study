@@ -795,3 +795,6 @@ tspan.term{border-bottom:0; text-decoration:underline dotted; text-decoration-th
 /* the dock header already says "Notes so far" and the count; the card's own title row would repeat it */
 .peek #factcard > details > summary{display:none}
 @media(max-width:1023px){ .peek #factcard > details > summary{display:flex} }
+
+/* Diagnostics switch: hide every temporary debug box unless html.diag (see top of shell.js). */
+html:not(.diag) :is(#peekdebug,#navdebug,#pzdebug,#pinchdiag,#frametiming,#minidebug){display:none !important}
