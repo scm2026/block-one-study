@@ -2363,7 +2363,7 @@ if(window.visualViewport){
       + `style.transform: ${actualT || '(empty)'}  ${matches ? 'MATCHES state' : 'MISMATCH vs state'}\n`
       + `computed: ${compT}  pz.pos=${getComputedStyle(pz).position}\n`
       + `layer w measured=${lr.width.toFixed(0)} expected=${(layer.offsetWidth * (active ? k : 1)).toFixed(0)}  paintPending=${needsPaint}`;
-    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + 'JUMP DIAG (jd1):\n' + (jdTrail.length ? jdTrail.join('\n') : '(none)') + '\n' + `PINCH DIAG  build=hand1  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
+    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + 'JUMP DIAG (jd1):\n' + (jdTrail.length ? jdTrail.join('\n') : '(none)') + '\n' + `PINCH DIAG  build=gest1  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
       + ((window.PZ_PINCH_DIAG && window.PZ_PINCH_DIAG().tp) ? window.PZ_PINCH_DIAG().tp() : '')
       + pinchDiagText();
   }
@@ -2638,6 +2638,40 @@ if(window.visualViewport){
     requestPaint();
     dbgUpdate();
   }, {passive:false});
+
+  /* 2026-10 Safari GESTURE events (input hand-off fix). Safari -- Mac trackpad, iPad trackpad, and any touch
+     pinch that slips past touch-action -- zooms the page itself and reports it ONLY as gesturestart /
+     gesturechange / gestureend (e.scale is cumulative since gesturestart), never as ctrl+wheel. That is a second,
+     separate zoom the engine could not see: everything incl. the fixed popups scaled together and our own zoom was
+     bypassed. preventDefault() on these events is what stops Safari's own zoom, and we then drive the SAME engine
+     (zoomAt) from e.scale, anchored at the cursor. A touch pinch that the pointer/touch paths already own
+     (PZ_PINCHING) is only prevented, never double-driven. The framework canvas keeps owning its pinch: native zoom
+     is still blocked over it, the page just isn't zoomed. */
+  const GE = {start:0, change:0, end:0, drove:0, ignored:0, over:0};
+  window.PZ_GESTURE = ()=>GE;
+  let geK0 = 1, geOn = false, geLast = null;
+  document.addEventListener('pointermove', e=>{ if(e.pointerType !== 'touch') geLast = {x:e.clientX, y:e.clientY}; }, {capture:true, passive:true});
+  const geXY = e=>{
+    if(Number.isFinite(e.clientX) && Number.isFinite(e.clientY) && (e.clientX || e.clientY)) return {x:e.clientX, y:e.clientY};
+    return geLast || {x:innerWidth / 2, y:innerHeight / 2};
+  };
+  const gePinching = ()=>!!(window.PZ_PINCHING && window.PZ_PINCHING());
+  document.addEventListener('gesturestart', e=>{
+    GE.start++; e.preventDefault();
+    if(e.target && e.target.closest && e.target.closest('.fwview')){ geOn = false; GE.over++; return; }
+    geK0 = k; geOn = true;
+  }, {passive:false});
+  document.addEventListener('gesturechange', e=>{
+    GE.change++; e.preventDefault();
+    if(!geOn) return;
+    if(gePinching()){ GE.ignored++; return; }
+    const p = geXY(e);
+    if(!active && geK0 * e.scale > K_MIN && window.PZ_PRE_ENGAGE) window.PZ_PRE_ENGAGE();
+    zoomAt(geK0 * e.scale, p.x, p.y); GE.drove++;
+    dbgUpdate();
+  }, {passive:false});
+  const geEnd = e=>{ GE.end++; e.preventDefault(); geOn = false; if(!gePinching()) disengageIfAtRest(); };
+  document.addEventListener('gestureend', geEnd, {passive:false});
 
   /* click-drag empty space to pan */
   let pend = null;
@@ -3082,6 +3116,7 @@ if(window.visualViewport){
     let t = `\nTOUCH EVENTS  ts=${TP.ts} tm=${TP.tm} te=${TP.te} tc=${TP.tc}  touches now=${TP.touches}  latest 2-finger d=${Math.round(TP.d2)}px  last touchmove cancelable=${TP.cancelable}`;
     if(TP.cur) t += '\n' + tpLine(TP.cur, 'NOW ');
     for(let i = TP.done.length - 1; i >= 0; i--) t += '\n' + tpLine(TP.done[i], 'prev');
+    { const g = window.PZ_GESTURE ? window.PZ_GESTURE() : null; if(g) t += `\nGESTURE EVENTS (Safari): start=${g.start} change=${g.change} end=${g.end} drove-zoom=${g.drove} ignored(touch owns)=${g.ignored} over-canvas=${g.over}`; }
     t += `\nHANDOFF: ${handoff ? 'ARMED (touch events driving zoom)' : (HO.everArmed ? 'ended (' + (HO.ended || '-') + ')' : 'never armed')}`
       + `  armed after ${HO.ptrMoves} pointer moves, k at arm=${HO.kArm.toFixed(2)}, touch-driven zoom calls=${HO.moves}, k now=${(window.PZ ? window.PZ.k : 1).toFixed(2)}`;
     return t;
