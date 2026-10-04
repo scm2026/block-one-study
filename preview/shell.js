@@ -2302,11 +2302,16 @@ if(window.visualViewport){
     rafScheduled = true;
     requestAnimationFrame(frameTick);
   }
+  let lastPaintTx = 0, lastPaintTy = 0, tySrc = '?';   /* TEMP DIAGNOSTIC: who last moved the page, and big per-frame jumps */
   function frameTick(){
     rafScheduled = false;
     if(needsPaint){
       needsPaint = false;
+      const _btx = tx, _bty = ty;
       clampPan();
+      if(Math.abs(_bty - ty) > 40 || Math.abs(_btx - tx) > 40) evLog(`CLAMP moved ty ${_bty.toFixed(0)}->${ty.toFixed(0)} tx ${_btx.toFixed(0)}->${tx.toFixed(0)} (docH=${wrap.scrollHeight} k=${k.toFixed(2)})`);
+      if(active && (Math.abs(ty - lastPaintTy) > 150 || Math.abs(tx - lastPaintTx) > 150)) evLog(`TY/TX JUMP in one frame: ty ${lastPaintTy.toFixed(0)}->${ty.toFixed(0)} tx ${lastPaintTx.toFixed(0)}->${tx.toFixed(0)} k=${k.toFixed(2)} last writer=${tySrc}`);
+      lastPaintTx = tx; lastPaintTy = ty;
       applyTransformNow();
     }
     if(needsDebug){
@@ -2339,7 +2344,7 @@ if(window.visualViewport){
       + `style.transform: ${actualT || '(empty)'}  ${matches ? 'MATCHES state' : 'MISMATCH vs state'}\n`
       + `computed: ${compT}  pz.pos=${getComputedStyle(pz).position}\n`
       + `layer w measured=${lr.width.toFixed(0)} expected=${(layer.offsetWidth * (active ? k : 1)).toFixed(0)}  paintPending=${needsPaint}`;
-    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + `PINCH DIAG  build=vv1  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
+    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + `PINCH DIAG  build=vv2  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
       + ((window.PZ_PINCH_DIAG && window.PZ_PINCH_DIAG().tp) ? window.PZ_PINCH_DIAG().tp() : '')
       + pinchDiagText();
   }
@@ -2474,13 +2479,14 @@ if(window.visualViewport){
     startFrameTimingProbe();  /* TEMP DIAGNOSTIC -- see block above */
     const _b = vvSnap(), _y = scrollY, _x = scrollX;
     active = true;
-    tx = -window.scrollX; ty = -window.scrollY;
+    tx = -window.scrollX; ty = -window.scrollY; lastPaintTx = tx; lastPaintTy = ty;
     pz.style.position = 'fixed'; pz.style.inset = '0'; pz.style.overflow = 'hidden';
     document.documentElement.classList.add('pz-active');
     evLog(`ENGAGE read scroll=(${_x.toFixed(0)},${_y.toFixed(0)}) lastKnownGood=(${lastGoodX.toFixed(0)},${lastGoodY.toFixed(0)})${Math.abs(_y - lastGoodY) > 40 ? '  <<< SCROLL READ DIFFERS' : ''} -> tx=${tx.toFixed(0)} ty=${ty.toFixed(0)} | ` + _b);
   }
   function disengage(){
     const _tx = tx, _ty = ty, _k = k;
+    const _who = (new Error().stack || '').split('\n').filter(l=>!/^Error/.test(l)).slice(0, 4).map(l=>l.trim().replace(/^at\s+/, '').replace(/\(?https?:[^)\s]*\/([^/)\s]*)\)?/, '$1').slice(0, 44)).join(' < ');
     active = false;
     const gx = Math.max(0, -tx), gy = Math.max(0, -ty);
     pz.style.position = ''; pz.style.inset = ''; pz.style.overflow = '';
@@ -2492,10 +2498,10 @@ if(window.visualViewport){
     needsPaint = false;
     applyTransformNow();
     window.scrollTo(gx, gy);
-    evLog(`DISENGAGE k=${_k.toFixed(2)} tx=${_tx.toFixed(0)} ty=${_ty.toFixed(0)} -> scrollTo(${gx.toFixed(0)},${gy.toFixed(0)}) landed=(${scrollX.toFixed(0)},${scrollY.toFixed(0)})${Math.abs(scrollY - gy) > 20 ? '  <<< DID NOT LAND' : ''} | ` + vvSnap());
+    evLog(`DISENGAGE by[${_who}] k=${_k.toFixed(2)} tx=${_tx.toFixed(0)} ty=${_ty.toFixed(0)} -> scrollTo(${gx.toFixed(0)},${gy.toFixed(0)}) landed=(${scrollX.toFixed(0)},${scrollY.toFixed(0)})${Math.abs(scrollY - gy) > 20 ? '  <<< DID NOT LAND' : ''} | ` + vvSnap());
   }
   function zoomAt(nextK, cx, cy){
-    zCalls++; zReq = nextK;                       /* TEMP DIAGNOSTIC */
+    zCalls++; zReq = nextK; tySrc = `zoomAt(k=${nextK.toFixed(2)}, cx=${cx.toFixed(0)}, cy=${cy.toFixed(0)})`;   /* TEMP DIAGNOSTIC */
     nextK = Math.min(K_MAX, Math.max(K_MIN, nextK));
     zSame = (nextK === k);                        /* TEMP DIAGNOSTIC */
     if(nextK === k) return;
@@ -2579,7 +2585,7 @@ if(window.visualViewport){
     if(!active){ dbgUpdate(); return; }
     if(e.target && e.target.closest && e.target.closest(WHEEL_SKIP)){ dbgUpdate(); return; }
     if(scrollAncestor(e.target, 'x') || scrollAncestor(e.target, 'y')){ dbgUpdate(); return; } /* an inner panel's own scrollbar handles it */
-    e.preventDefault();
+    e.preventDefault(); tySrc = 'wheel';
     tx -= e.deltaX / k; ty -= e.deltaY / k;
     requestPaint();
     dbgUpdate();
@@ -2658,6 +2664,7 @@ if(window.visualViewport){
     if(pend.xEl) pend.xEl.scrollLeft = pend.sl - dx;
     if(pend.yEl) pend.yEl.scrollTop  = pend.st - dy;
     if(active){
+      tySrc = `ONE-FINGER PAN pointer#${pend.id} dx=${dx.toFixed(0)} dy=${dy.toFixed(0)} ty0=${pend.ty0.toFixed(0)}`;
       if(!pend.xEl) tx = pend.tx0 + dx / k;
       if(!pend.yEl) ty = pend.ty0 + dy / k;
       requestPaint();
@@ -2705,7 +2712,7 @@ if(window.visualViewport){
     const dt = Math.min(48, now - glide.t); glide.t = now;
     const dec = Math.pow(0.998, dt);
     glide.vx *= dec; glide.vy *= dec;
-    const ox = tx, oy = ty;
+    const ox = tx, oy = ty; tySrc = 'glide';
     if(glide.vx) tx += glide.vx * dt / k;
     if(glide.vy) ty += glide.vy * dt / k;
     const ix = tx, iy = ty;
