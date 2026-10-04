@@ -2310,7 +2310,8 @@ if(window.visualViewport){
       + `style.transform: ${actualT || '(empty)'}  ${matches ? 'MATCHES state' : 'MISMATCH vs state'}\n`
       + `computed: ${compT}  pz.pos=${getComputedStyle(pz).position}\n`
       + `layer w measured=${lr.width.toFixed(0)} expected=${(layer.offsetWidth * (active ? k : 1)).toFixed(0)}  paintPending=${needsPaint}`;
-    dbg2.textContent = `PINCH DIAG  build=ta2  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
+    dbg2.textContent = `PINCH DIAG  build=tp1  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
+      + ((window.PZ_PINCH_DIAG && window.PZ_PINCH_DIAG().tp) ? window.PZ_PINCH_DIAG().tp() : '')
       + pinchDiagText();
   }
   /* TEMP DIAGNOSTIC: the touch list globalPinch() is holding, its recent touch events, and what
@@ -2749,7 +2750,7 @@ if(window.visualViewport){
     if(window.PZ_DBG) window.PZ_DBG();
   }
   window.PZ_PINCH_DIAG = ()=>({
-    n: pts.size, ids: [...pts.keys()], trace: diagTrace, moves: diagMoves, cnt: diagCnt,
+    n: pts.size, ids: [...pts.keys()], trace: diagTrace, moves: diagMoves, cnt: diagCnt, tp: tpText,
     d0: pinch ? Math.round(pinch.d) : '-', d: pinch ? Math.round(diagD) : '-', want: pinch ? diagWant.toFixed(2) : '-'
   });
   /* ===== end TEMP DIAGNOSTIC ===== */
@@ -2807,6 +2808,7 @@ if(window.visualViewport){
     pts.delete(e.pointerId);
     if(e.pointerType === 'touch'){   /* TEMP DIAGNOSTIC */
       const inf = diagInfo.get(e.pointerId), dt = inf ? Math.round(performance.now() - inf.t) : -1;
+      if(e.type === 'pointercancel') tpOnPointerCancel();
       if(e.type === 'pointercancel'){ diagCnt.cancel++; if(inf && /^[XY]/.test(inf.ta)) diagCnt.cancelPan++; else diagCnt.cancelNone++; } else diagCnt.up++;
       diagLog(`${e.type === 'pointercancel' ? 'CANCEL' : 'up'}#${e.pointerId} +${dt}ms mv=${diagMoves} ta@down=${inf ? inf.ta : '?'} pz@down=${inf ? (inf.act?1:0) : '?'} n=${pts.size}`);
       diagInfo.delete(e.pointerId);
@@ -2820,6 +2822,60 @@ if(window.visualViewport){
       if(window.PZ_DISENGAGE_IF_AT_REST) window.PZ_DISENGAGE_IF_AT_REST();
     }
   };
+  /* ===== TEMP DIAGNOSTIC (Option B probe, 2026-10, preview-only, READ-ONLY) =====
+     Question: after the browser cancels the Pointer Events stream (pointercancel), do Touch Events
+     (touchstart/move/end/cancel) keep arriving for the same fingers, and for how long?
+     Passive listeners only. Nothing here calls preventDefault() or drives zoom. */
+  const TP = {ts:0, tm:0, te:0, tc:0, touches:0, d2:0, cancelable:'-', cur:null, done:[]};
+  const tpNow = () => performance.now();
+  const tpDist = e => e.touches.length >= 2 ? Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY) : 0;
+  const tpNew = () => ({t0: tpNow(), maxTouches: 0, tmBefore: 0, pcAt: null, tmAfter: 0, lastTmAfter: 0, endedAfter: '', d2Start: 0, d2Last: 0});
+  function tpFinish(how){
+    const g = TP.cur; if(!g) return;
+    g.end = how; g.endAt = tpNow();
+    TP.done.push(g); if(TP.done.length > 3) TP.done.shift();
+    TP.cur = null;
+  }
+  document.addEventListener('touchstart', e=>{
+    TP.ts++; TP.touches = e.touches.length;
+    if(e.touches.length === 1 || !TP.cur) TP.cur = tpNew();
+    const g = TP.cur; g.maxTouches = Math.max(g.maxTouches, e.touches.length);
+    if(e.touches.length === 2){ g.d2Start = tpDist(e); g.d2Last = g.d2Start; }
+    TP.d2 = tpDist(e);
+    if(window.PZ_DBG) window.PZ_DBG();
+  }, {capture:true, passive:true});
+  document.addEventListener('touchmove', e=>{
+    TP.tm++; TP.touches = e.touches.length; TP.cancelable = e.cancelable ? 'yes' : 'NO';
+    const g = TP.cur;
+    const d = tpDist(e); if(d) { TP.d2 = d; if(g) g.d2Last = d; }
+    if(g){
+      if(g.pcAt === null) g.tmBefore++;
+      else { g.tmAfter++; g.lastTmAfter = tpNow() - g.pcAt; }
+    }
+    if(window.PZ_DBG) window.PZ_DBG();
+  }, {capture:true, passive:true});
+  document.addEventListener('touchend', e=>{
+    TP.te++; TP.touches = e.touches.length;
+    if(TP.cur && TP.cur.pcAt !== null && !TP.cur.endedAfter) TP.cur.endedAfter = 'touchend@+' + Math.round(tpNow() - TP.cur.pcAt) + 'ms';
+    if(e.touches.length === 0) tpFinish('touchend');
+    if(window.PZ_DBG) window.PZ_DBG();
+  }, {capture:true, passive:true});
+  document.addEventListener('touchcancel', e=>{
+    TP.tc++; TP.touches = e.touches.length;
+    if(TP.cur && TP.cur.pcAt !== null && !TP.cur.endedAfter) TP.cur.endedAfter = 'touchcancel@+' + Math.round(tpNow() - TP.cur.pcAt) + 'ms';
+    if(e.touches.length === 0) tpFinish('touchcancel');
+    if(window.PZ_DBG) window.PZ_DBG();
+  }, {capture:true, passive:true});
+  function tpOnPointerCancel(){ if(TP.cur && TP.cur.pcAt === null) TP.cur.pcAt = tpNow(); }
+  const tpLine = (g, tag) => `${tag} fingers<=${g.maxTouches} d2:${Math.round(g.d2Start)}->${Math.round(g.d2Last)}  touchmove before ptrcancel=${g.tmBefore}`
+    + (g.pcAt === null ? '  (no pointercancel)' : `  | AFTER ptrcancel: touchmove=${g.tmAfter}, last at +${Math.round(g.lastTmAfter)}ms, ${g.endedAfter || 'still down'}`);
+  function tpText(){
+    let t = `\nTOUCH EVENTS  ts=${TP.ts} tm=${TP.tm} te=${TP.te} tc=${TP.tc}  touches now=${TP.touches}  latest 2-finger d=${Math.round(TP.d2)}px  last touchmove cancelable=${TP.cancelable}`;
+    if(TP.cur) t += '\n' + tpLine(TP.cur, 'NOW ');
+    for(let i = TP.done.length - 1; i >= 0; i--) t += '\n' + tpLine(TP.done[i], 'prev');
+    return t;
+  }
+  /* ===== end Option B probe ===== */
   document.addEventListener('touchcancel', e=>{ diagCnt.tcancel++; diagLog(`touchcancel cancelable=${e.cancelable} touches=${e.touches.length}`); }, {capture:true, passive:true});   /* TEMP DIAGNOSTIC */
   document.addEventListener('pointerup', up, {capture:true});
   document.addEventListener('pointercancel', up, {capture:true});
