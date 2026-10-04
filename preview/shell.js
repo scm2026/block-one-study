@@ -2311,7 +2311,8 @@ if(window.visualViewport){
   function pinchDiagText(){
     const d = window.PZ_PINCH_DIAG ? window.PZ_PINCH_DIAG() : null;
     if(!d) return '';
-    return `\npts=${d.n} ids=[${d.ids.join(',')}]  pinch d0=${d.d0} d=${d.d} wantK=${d.want}  moves=${d.moves}`
+    return `\nCANCELS=${d.cnt.cancel} (landed w/ native pan allowed=${d.cnt.cancelPan}, none=${d.cnt.cancelNone})  ups=${d.cnt.up}  touchcancel=${d.cnt.tcancel}`
+      + `\npts=${d.n} ids=[${d.ids.join(',')}]  pinch d0=${d.d0} d=${d.d} wantK=${d.want}  moves=${d.moves}`
       + `\nzoomAt calls=${zCalls} lastReq=${zReq.toFixed(2)}${zSame ? ' (clamped/no change)' : ''} k=${k.toFixed(2)}`
       + (d.trace.length ? '\n' + d.trace.join('\n') : '');
   }
@@ -2703,13 +2704,35 @@ if(window.visualViewport){
     const c = (typeof el.className === 'string' && el.className) ? '.' + el.className.split(' ')[0] : '';
     return (el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + c).slice(0, 22);
   };
+  /* TEMP DIAGNOSTIC (touch-action at touch start): effective touch-action for a touch that lands on
+     `el` = intersection of touch-action from el up through the nearest scroll container (inclusive);
+     also the raw value on el itself. Letters: X=pan-x Y=pan-y Z=pinch-zoom; '-' = none. */
+  const diagTA = el => {
+    const toks = v => { v=(v||'auto').trim(); if(v==='none') return new Set(); if(v==='manipulation') return new Set(['x','y','z']);
+      if(v==='auto') return new Set(['x','y','z']); const r=new Set(); if(/pan-x/.test(v)) r.add('x'); if(/pan-y/.test(v)) r.add('y');
+      if(/pan-left|pan-right/.test(v)) r.add('x'); if(/pan-up|pan-down/.test(v)) r.add('y'); if(/pinch-zoom/.test(v)) r.add('z');
+      if(/pan-[xy]/.test(v) && !/pinch-zoom/.test(v)) {} return r; };
+    let eff = new Set(['x','y','z']), n = el, raw = '';
+    while(n && n.nodeType === 1){
+      const cs = getComputedStyle(n), t = toks(cs.touchAction);
+      if(!raw) raw = cs.touchAction;
+      eff = new Set([...eff].filter(c => t.has(c)));
+      const ov = cs.overflowX + cs.overflowY;
+      if(n === document.documentElement || /auto|scroll|hidden/.test(ov) && n !== document.body) break;
+      n = n.parentElement;
+    }
+    const str = ['x','y','z'].map(c => eff.has(c) ? c.toUpperCase() : '').join('') || '-';
+    return str + '(' + raw.replace(/pan-/g,'p').replace(/pinch-zoom/,'Z') + ')';
+  };
+  const diagInfo = new Map();   /* pointerId -> {t, ta, act} captured at touchstart */
+  const diagCnt = {cancel:0, cancelPan:0, cancelNone:0, up:0, tcancel:0};
   function diagLog(s){
     diagTrace.push(((performance.now() - diagT0) / 1000).toFixed(1) + 's ' + s);
-    if(diagTrace.length > 6) diagTrace.shift();
+    if(diagTrace.length > 8) diagTrace.shift();
     if(window.PZ_DBG) window.PZ_DBG();
   }
   window.PZ_PINCH_DIAG = ()=>({
-    n: pts.size, ids: [...pts.keys()], trace: diagTrace, moves: diagMoves,
+    n: pts.size, ids: [...pts.keys()], trace: diagTrace, moves: diagMoves, cnt: diagCnt,
     d0: pinch ? Math.round(pinch.d) : '-', d: pinch ? Math.round(diagD) : '-', want: pinch ? diagWant.toFixed(2) : '-'
   });
   /* ===== end TEMP DIAGNOSTIC ===== */
@@ -2718,7 +2741,9 @@ if(window.visualViewport){
     if(e.pointerType !== 'touch') return;
     if(e.target && e.target.closest && e.target.closest('.fwview')){ diagLog(`down#${e.pointerId} fwview (skipped)`); return; }   /* fwBindZoom owns this */
     pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
-    diagLog(`down#${e.pointerId}${e.isPrimary ? '*' : ''} ${diagDesc(e.target)} n=${pts.size}`);
+    { const ta = diagTA(e.target), act = document.documentElement.classList.contains('pz-active');
+      diagInfo.set(e.pointerId, {t: performance.now(), ta, act});
+      diagLog(`down#${e.pointerId}${e.isPrimary ? '*' : ''} ${diagDesc(e.target)} ta=${ta} pz=${act ? 1 : 0} n=${pts.size}`); }
     if(pts.size === 2){
       const [a,b] = [...pts.values()];
       pinch = {d: Math.hypot(a.x-b.x, a.y-b.y), k: window.PZ ? window.PZ.k : 1};
@@ -2763,7 +2788,12 @@ if(window.visualViewport){
   const up = e=>{
     const hadIt = pts.has(e.pointerId);                                               /* TEMP DIAGNOSTIC */
     pts.delete(e.pointerId);
-    if(e.pointerType === 'touch') diagLog(`${e.type === 'pointercancel' ? 'CANCEL' : 'up'}#${e.pointerId}${hadIt ? '' : ' (not tracked)'} ${diagDesc(e.target)} n=${pts.size}`);   /* TEMP DIAGNOSTIC */
+    if(e.pointerType === 'touch'){   /* TEMP DIAGNOSTIC */
+      const inf = diagInfo.get(e.pointerId), dt = inf ? Math.round(performance.now() - inf.t) : -1;
+      if(e.type === 'pointercancel'){ diagCnt.cancel++; if(inf && /^[XY]/.test(inf.ta)) diagCnt.cancelPan++; else diagCnt.cancelNone++; } else diagCnt.up++;
+      diagLog(`${e.type === 'pointercancel' ? 'CANCEL' : 'up'}#${e.pointerId} +${dt}ms mv=${diagMoves} ta@down=${inf ? inf.ta : '?'} pz@down=${inf ? (inf.act?1:0) : '?'} n=${pts.size}`);
+      diagInfo.delete(e.pointerId);
+    }
     if(pts.size < 2){
       pinch = null;
       /* A two-finger touch that landed (triggering PZ_PRE_ENGAGE above) and lifted without
@@ -2773,6 +2803,7 @@ if(window.visualViewport){
       if(window.PZ_DISENGAGE_IF_AT_REST) window.PZ_DISENGAGE_IF_AT_REST();
     }
   };
+  document.addEventListener('touchcancel', e=>{ diagCnt.tcancel++; diagLog(`touchcancel cancelable=${e.cancelable} touches=${e.touches.length}`); }, {capture:true, passive:true});   /* TEMP DIAGNOSTIC */
   document.addEventListener('pointerup', up, {capture:true});
   document.addEventListener('pointercancel', up, {capture:true});
 
