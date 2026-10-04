@@ -2302,6 +2302,12 @@ if(window.visualViewport){
     rafScheduled = true;
     requestAnimationFrame(frameTick);
   }
+  /* TEMP DIAGNOSTIC (jd1): low-threshold jump recorder for the pinch -- who shifted the page, input stalls, midpoint jumps */
+  const jdTrail = []; let jdT0 = 0, jdLastFrame = 0, jdLastCx = NaN, jdLastCy = NaN, jdLastZT = 0;
+  const jd = m=>{ jdTrail.push(((performance.now() - jdT0) / 1000).toFixed(2) + 's ' + m); if(jdTrail.length > 8) jdTrail.shift(); needsDebug = true; };
+  window.PZ_JD = jd;
+  window.addEventListener('scroll', ()=>{ if(active) jd(`window scroll event -> (${scrollX.toFixed(0)},${scrollY.toFixed(0)})`); }, {passive:true});
+  if(window.visualViewport){ ['resize','scroll'].forEach(t=>window.visualViewport.addEventListener(t, ()=>{ if(active){ const v = window.visualViewport; jd(`vv ${t}: scale=${v.scale.toFixed(2)} off=(${v.offsetLeft.toFixed(0)},${v.offsetTop.toFixed(0)}) h=${v.height.toFixed(0)}`); } })); }
   let lastPaintTx = 0, lastPaintTy = 0, tySrc = '?';   /* TEMP DIAGNOSTIC: who last moved the page, and big per-frame jumps */
   function frameTick(){
     rafScheduled = false;
@@ -2309,6 +2315,10 @@ if(window.visualViewport){
       needsPaint = false;
       const _btx = tx, _bty = ty;
       clampPan();
+      { const _n = performance.now();
+        if(active && jdLastFrame && _n - jdLastFrame > 45) jd(`INPUT/PAINT GAP ${Math.round(_n - jdLastFrame)}ms (k=${k.toFixed(2)})`);
+        jdLastFrame = _n;
+        if(active && (Math.abs(_bty - ty) > 1.5 || Math.abs(_btx - tx) > 1.5)) jd(`CLAMP shifted ty ${(ty - _bty).toFixed(1)} tx ${(tx - _btx).toFixed(1)} k=${k.toFixed(2)} writer=${tySrc}`); }
       if(Math.abs(_bty - ty) > 40 || Math.abs(_btx - tx) > 40) evLog(`CLAMP moved ty ${_bty.toFixed(0)}->${ty.toFixed(0)} tx ${_btx.toFixed(0)}->${tx.toFixed(0)} (docH=${wrap.scrollHeight} k=${k.toFixed(2)})`);
       if(active && (Math.abs(ty - lastPaintTy) > 150 || Math.abs(tx - lastPaintTx) > 150)) evLog(`TY/TX JUMP in one frame: ty ${lastPaintTy.toFixed(0)}->${ty.toFixed(0)} tx ${lastPaintTx.toFixed(0)}->${tx.toFixed(0)} k=${k.toFixed(2)} last writer=${tySrc}`);
       lastPaintTx = tx; lastPaintTy = ty;
@@ -2344,7 +2354,7 @@ if(window.visualViewport){
       + `style.transform: ${actualT || '(empty)'}  ${matches ? 'MATCHES state' : 'MISMATCH vs state'}\n`
       + `computed: ${compT}  pz.pos=${getComputedStyle(pz).position}\n`
       + `layer w measured=${lr.width.toFixed(0)} expected=${(layer.offsetWidth * (active ? k : 1)).toFixed(0)}  paintPending=${needsPaint}`;
-    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + `PINCH DIAG  build=sp1  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
+    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + 'JUMP DIAG (jd1):\n' + (jdTrail.length ? jdTrail.join('\n') : '(none)') + '\n' + `PINCH DIAG  build=jd1  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
       + ((window.PZ_PINCH_DIAG && window.PZ_PINCH_DIAG().tp) ? window.PZ_PINCH_DIAG().tp() : '')
       + pinchDiagText();
   }
@@ -2517,6 +2527,9 @@ if(window.visualViewport){
   }
   function zoomAt(nextK, cx, cy){
     zCalls++; zReq = nextK; tySrc = `zoomAt(k=${nextK.toFixed(2)}, cx=${cx.toFixed(0)}, cy=${cy.toFixed(0)})`;   /* TEMP DIAGNOSTIC */
+    { const _n = performance.now();
+      if(active && jdLastZT && _n - jdLastZT < 400 && Math.hypot(cx - jdLastCx, cy - jdLastCy) > 20) jd(`MIDPOINT JUMP ${Math.round(Math.hypot(cx - jdLastCx, cy - jdLastCy))}px (${jdLastCx.toFixed(0)},${jdLastCy.toFixed(0)})->(${cx.toFixed(0)},${cy.toFixed(0)}) k=${k.toFixed(2)}->${nextK.toFixed(2)}`);
+      jdLastCx = cx; jdLastCy = cy; jdLastZT = _n; }
     nextK = Math.min(K_MAX, Math.max(K_MIN, nextK));
     zSame = (nextK === k);                        /* TEMP DIAGNOSTIC */
     if(nextK === k) return;
@@ -2551,6 +2564,7 @@ if(window.visualViewport){
     const _snap = tag=>{ const t = _ref ? _ref.getBoundingClientRect().top : NaN;
       return `${tag} drift=${(t - _r0).toFixed(1)}px k=${k.toFixed(2)} vvH=${_vv ? _vv.height.toFixed(0) : '?'} vvOffTop=${_vv ? _vv.offsetTop.toFixed(0) : '?'} innerH=${innerHeight}`; };
     const _pre = _snap('before');
+    jdT0 = performance.now(); jdTrail.length = 0; jdLastFrame = 0; jdLastZT = 0; jd('pre-engage (2nd finger down)');
     engage();
     applyTransformNow();
     const _out = [_pre, _snap('sync after engage')];
@@ -2989,6 +3003,7 @@ if(window.visualViewport){
     if(e.pointerType === 'touch'){   /* TEMP DIAGNOSTIC */
       const inf = diagInfo.get(e.pointerId), dt = inf ? Math.round(performance.now() - inf.t) : -1;
       if(e.type === 'pointercancel') tpOnPointerCancel();
+      if(window.PZ_JD && window.PZ && window.PZ.active) window.PZ_JD(`${e.type} id#${e.pointerId} fingers left=${pts.size}`);
       if(e.type === 'pointercancel'){ diagCnt.cancel++; if(inf && /^[XY]/.test(inf.ta)) diagCnt.cancelPan++; else diagCnt.cancelNone++; } else diagCnt.up++;
       diagLog(`${e.type === 'pointercancel' ? 'CANCEL' : 'up'}#${e.pointerId} +${dt}ms mv=${diagMoves} ta@down=${inf ? inf.ta : '?'} pz@down=${inf ? (inf.act?1:0) : '?'} n=${pts.size}`);
       diagInfo.delete(e.pointerId);
