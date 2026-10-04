@@ -769,6 +769,12 @@ tspan.term{border-bottom:0; text-decoration:underline dotted; text-decoration-th
    z-index. No descendant inside #dock relies on an absolute-positioned ancestor here (.rz only
    exists on .peek.float, which this breakpoint's narrow() unfloats before this layout ever
    applies), so this has no other layout side effects. */
+/* A touch that lands on a docked panel floats it and drags it on that same touch (see floatIt in
+   shell.js), but the browser fixes a touch's pan/zoom rights at touch-down -- before the panel is
+   floated -- so with touch-action:auto here native page pan could claim the gesture ~250ms in and
+   cancel the drag (pointercancel; the window "gets stuck midscreen"). Wide layout only: below 1024px
+   the dock stacks, nothing floats, and native scrolling must stay. */
+@media(min-width:1024px){ #dock .peek{touch-action:none} }
 @media(max-width:1023px){
   #dock{position:relative; transform:none; margin:16px; max-height:none; align-items:stretch}
   .peek, .peek.open{width:auto} .peek .pbody, .peek.open .pbody{max-height:none; overflow:visible; padding:4px 12px 12px}
