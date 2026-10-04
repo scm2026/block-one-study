@@ -2270,7 +2270,7 @@ if(window.visualViewport){
   const dbg2 = document.createElement('div');
   dbg2.id = 'pinchdiag';
   dbg2.style.cssText = 'position:fixed;bottom:4px;right:70px;z-index:2147483000;background:rgba(0,0,0,.82);'
-    + 'color:#9fe;font:11px/1.45 monospace;padding:5px 8px;border-radius:4px;pointer-events:none;white-space:pre;max-width:60vw';
+    + 'color:#9fe;font:10px/1.35 monospace;padding:5px 8px;border-radius:4px;pointer-events:none;white-space:pre-wrap;word-break:break-all;width:62vw;max-width:62vw';
   document.body.appendChild(dbg2);
   let ctrlTicks = 0, plainTicks = 0, lastWheel = 'none yet', lastDrag = 'none yet';
   /* TEMP DIAGNOSTIC (2026-10, preview-only, remove with the other readout lines): what zoomAt()
@@ -2339,7 +2339,7 @@ if(window.visualViewport){
       + `style.transform: ${actualT || '(empty)'}  ${matches ? 'MATCHES state' : 'MISMATCH vs state'}\n`
       + `computed: ${compT}  pz.pos=${getComputedStyle(pz).position}\n`
       + `layer w measured=${lr.width.toFixed(0)} expected=${(layer.offsetWidth * (active ? k : 1)).toFixed(0)}  paintPending=${needsPaint}`;
-    dbg2.textContent = `PINCH DIAG  build=ho1  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
+    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + `PINCH DIAG  build=vv1  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
       + ((window.PZ_PINCH_DIAG && window.PZ_PINCH_DIAG().tp) ? window.PZ_PINCH_DIAG().tp() : '')
       + pinchDiagText();
   }
@@ -2450,14 +2450,37 @@ if(window.visualViewport){
   }
   /* ===== end TEMP DIAGNOSTIC ===== */
 
+  /* TEMP DIAGNOSTIC (2026-10, preview-only; remove with the other readouts): "the docked windows
+     sometimes vanish after zooming" and "the page jumps to the top when I touch / when I lift after
+     zooming out". Both could be the app's own engage()/disengage() mis-reading scroll, OR Safari's
+     native visual viewport having been scaled/panned underneath us (fixed-position things such as
+     the dock are anchored to the LAYOUT viewport, so a panned/scaled visual viewport leaves them
+     off-screen even though the app thinks k=1). vvSnap() records both sides at every engage /
+     disengage and whenever the visual viewport leaves/returns to scale 1, shown in #pinchdiag. */
+  const vvSnap = ()=>{ const v = window.visualViewport; if(!v) return 'no visualViewport';
+    return `vv.scale=${v.scale.toFixed(3)} off=(${v.offsetLeft.toFixed(0)},${v.offsetTop.toFixed(0)}) page=(${v.pageLeft.toFixed(0)},${v.pageTop.toFixed(0)}) ${v.width.toFixed(0)}x${v.height.toFixed(0)} inner=${innerWidth}x${innerHeight} scroll=(${scrollX.toFixed(0)},${scrollY.toFixed(0)}) docW=${document.documentElement.scrollWidth}`; };
+  const evTrail = []; let lastGoodY = 0, lastGoodX = 0, nativeZoomOn = false;
+  const evLog = m=>{ evTrail.push(((performance.now()/1000)|0) + 's ' + m); if(evTrail.length > 5) evTrail.shift(); needsDebug = true; scheduleFrame(); };
+  window.addEventListener('scroll', ()=>{ if(!active){ lastGoodY = scrollY; lastGoodX = scrollX; } }, {passive:true});
+  if(window.visualViewport){
+    const vchk = ()=>{ const v = window.visualViewport, on = v.scale > 1.001 || Math.abs(v.offsetLeft) > 1;
+      if(on !== nativeZoomOn){ nativeZoomOn = on; evLog(`VISUAL VIEWPORT ${on ? 'LEFT' : 'BACK TO'} NORMAL  ` + vvSnap()); }
+      needsDebug = true; scheduleFrame(); };
+    window.visualViewport.addEventListener('resize', vchk); window.visualViewport.addEventListener('scroll', vchk);
+  }
+  window.PZ_VVSNAP = vvSnap; window.PZ_EVTRAIL = ()=>evTrail;
+
   function engage(){
     startFrameTimingProbe();  /* TEMP DIAGNOSTIC -- see block above */
+    const _b = vvSnap(), _y = scrollY, _x = scrollX;
     active = true;
     tx = -window.scrollX; ty = -window.scrollY;
     pz.style.position = 'fixed'; pz.style.inset = '0'; pz.style.overflow = 'hidden';
     document.documentElement.classList.add('pz-active');
+    evLog(`ENGAGE read scroll=(${_x.toFixed(0)},${_y.toFixed(0)}) lastKnownGood=(${lastGoodX.toFixed(0)},${lastGoodY.toFixed(0)})${Math.abs(_y - lastGoodY) > 40 ? '  <<< SCROLL READ DIFFERS' : ''} -> tx=${tx.toFixed(0)} ty=${ty.toFixed(0)} | ` + _b);
   }
   function disengage(){
+    const _tx = tx, _ty = ty, _k = k;
     active = false;
     const gx = Math.max(0, -tx), gy = Math.max(0, -ty);
     pz.style.position = ''; pz.style.inset = ''; pz.style.overflow = '';
@@ -2469,6 +2492,7 @@ if(window.visualViewport){
     needsPaint = false;
     applyTransformNow();
     window.scrollTo(gx, gy);
+    evLog(`DISENGAGE k=${_k.toFixed(2)} tx=${_tx.toFixed(0)} ty=${_ty.toFixed(0)} -> scrollTo(${gx.toFixed(0)},${gy.toFixed(0)}) landed=(${scrollX.toFixed(0)},${scrollY.toFixed(0)})${Math.abs(scrollY - gy) > 20 ? '  <<< DID NOT LAND' : ''} | ` + vvSnap());
   }
   function zoomAt(nextK, cx, cy){
     zCalls++; zReq = nextK;                       /* TEMP DIAGNOSTIC */
