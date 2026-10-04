@@ -2237,6 +2237,10 @@ if(window.visualViewport){
     + 'color:#fff;font:11px/1.5 monospace;padding:5px 8px;border-radius:4px;pointer-events:none;white-space:pre';
   document.body.appendChild(dbg);
   let ctrlTicks = 0, plainTicks = 0, lastWheel = 'none yet', lastDrag = 'none yet';
+  /* TEMP DIAGNOSTIC (2026-10, preview-only, remove with the other readout lines): what zoomAt()
+     was last asked for, and whether it changed anything. Plain numbers only -- formatted in
+     renderDebug(), never per event. */
+  let zCalls = 0, zReq = 1, zSame = false;
 
   /* 2026-10: rAF batching/perf pass. Raw pointermove/wheel events can arrive far faster than
      the display can paint (a touch surface on iPad Pro firing well above 60/s). The previous
@@ -2298,8 +2302,20 @@ if(window.visualViewport){
       + `last drag: ${lastDrag}\n`
       + `style.transform: ${actualT || '(empty)'}  ${matches ? 'MATCHES state' : 'MISMATCH vs state'}\n`
       + `computed: ${compT}  pz.pos=${getComputedStyle(pz).position}\n`
-      + `layer w measured=${lr.width.toFixed(0)} expected=${(layer.offsetWidth * (active ? k : 1)).toFixed(0)}  paintPending=${needsPaint}`;
+      + `layer w measured=${lr.width.toFixed(0)} expected=${(layer.offsetWidth * (active ? k : 1)).toFixed(0)}  paintPending=${needsPaint}`
+      + pinchDiagText();
   }
+  /* TEMP DIAGNOSTIC: the touch list globalPinch() is holding, its recent touch events, and what
+     the zoom engine was last asked for. A finger the browser has lifted but the list still holds
+     (a "ghost") shows up here as pts larger than the number of fingers actually on the glass. */
+  function pinchDiagText(){
+    const d = window.PZ_PINCH_DIAG ? window.PZ_PINCH_DIAG() : null;
+    if(!d) return '';
+    return `\npts=${d.n} ids=[${d.ids.join(',')}]  pinch d0=${d.d0} d=${d.d} wantK=${d.want}  moves=${d.moves}`
+      + `\nzoomAt calls=${zCalls} lastReq=${zReq.toFixed(2)}${zSame ? ' (clamped/no change)' : ''} k=${k.toFixed(2)}`
+      + (d.trace.length ? '\n' + d.trace.join('\n') : '');
+  }
+  window.PZ_DBG = ()=>{ needsDebug = true; scheduleFrame(); };   /* TEMP DIAGNOSTIC: lets globalPinch() refresh the readout */
   /* Kept as the name every existing call site already uses -- now a cheap flag-set instead of
      an immediate string build + DOM write. Per-event callers (the wheel/drag handlers below)
      need no changes beyond this redefinition to stop hammering the DOM on every tick. */
@@ -2416,7 +2432,9 @@ if(window.visualViewport){
     window.scrollTo(gx, gy);
   }
   function zoomAt(nextK, cx, cy){
+    zCalls++; zReq = nextK;                       /* TEMP DIAGNOSTIC */
     nextK = Math.min(K_MAX, Math.max(K_MIN, nextK));
+    zSame = (nextK === k);                        /* TEMP DIAGNOSTIC */
     if(nextK === k) return;
     if(!active && nextK > K_MIN) engage();
     const localX = cx / k - tx, localY = cy / k - ty;
@@ -2671,13 +2689,40 @@ if(window.visualViewport){
   const pts = new Map();   // pointerId -> {x,y}, every touch pointer currently down
   let pinch = null;        // {d,k}: distance and PZ.k snapshot at the instant the pair formed
 
+  /* ===== TEMP DIAGNOSTIC (2026-10, preview-only; remove with the #pzdebug readout lines) =====
+     For the "pinch gets stuck from one spot until reload" report: records which element each
+     finger landed on, every lift/cancel, and the live touch list -- so a ghost finger (held in
+     `pts` after the browser already lifted it), a finger that landed on something unexpected
+     (the dock, a slider), or a browser-sent pointercancel shows up on screen. Read-only: none of
+     this changes what the handlers below do. */
+  const diagT0 = performance.now();
+  const diagTrace = [];
+  let diagMoves = 0, diagD = 0, diagWant = 0;
+  const diagDesc = el => {
+    if(!el || !el.tagName) return '?';
+    const c = (typeof el.className === 'string' && el.className) ? '.' + el.className.split(' ')[0] : '';
+    return (el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + c).slice(0, 22);
+  };
+  function diagLog(s){
+    diagTrace.push(((performance.now() - diagT0) / 1000).toFixed(1) + 's ' + s);
+    if(diagTrace.length > 6) diagTrace.shift();
+    if(window.PZ_DBG) window.PZ_DBG();
+  }
+  window.PZ_PINCH_DIAG = ()=>({
+    n: pts.size, ids: [...pts.keys()], trace: diagTrace, moves: diagMoves,
+    d0: pinch ? Math.round(pinch.d) : '-', d: pinch ? Math.round(diagD) : '-', want: pinch ? diagWant.toFixed(2) : '-'
+  });
+  /* ===== end TEMP DIAGNOSTIC ===== */
+
   document.addEventListener('pointerdown', e=>{
     if(e.pointerType !== 'touch') return;
-    if(e.target && e.target.closest && e.target.closest('.fwview')) return;   /* fwBindZoom owns this */
+    if(e.target && e.target.closest && e.target.closest('.fwview')){ diagLog(`down#${e.pointerId} fwview (skipped)`); return; }   /* fwBindZoom owns this */
     pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    diagLog(`down#${e.pointerId}${e.isPrimary ? '*' : ''} ${diagDesc(e.target)} n=${pts.size}`);
     if(pts.size === 2){
       const [a,b] = [...pts.values()];
       pinch = {d: Math.hypot(a.x-b.x, a.y-b.y), k: window.PZ ? window.PZ.k : 1};
+      diagMoves = 0;
       /* Order matters: release any provisional single-pointer gesture FIRST, before either
          system's own bubble-phase pointerdown handler for this same event runs (capture
          fires top-down before bubble on the same node, so both calls below complete before
@@ -2710,11 +2755,15 @@ if(window.visualViewport){
        counterpart to e.preventDefault() in pageZoom()'s own wheel/pend handlers above -- same
        principle (claim the gesture explicitly once we've decided to own it), different input. */
     e.preventDefault();
+    diagMoves++; diagD = d; diagWant = pinch.d > 0 ? pinch.k * (d / pinch.d) : 0;   /* TEMP DIAGNOSTIC */
+    if(window.PZ_DBG) window.PZ_DBG();                                                /* TEMP DIAGNOSTIC: keep the readout live during a pinch */
     if(pinch.d > 0 && window.PZ_ZOOM_AT) window.PZ_ZOOM_AT(pinch.k * (d/pinch.d), (a.x+b.x)/2, (a.y+b.y)/2);
   }, {capture:true});
 
   const up = e=>{
+    const hadIt = pts.has(e.pointerId);                                               /* TEMP DIAGNOSTIC */
     pts.delete(e.pointerId);
+    if(e.pointerType === 'touch') diagLog(`${e.type === 'pointercancel' ? 'CANCEL' : 'up'}#${e.pointerId}${hadIt ? '' : ' (not tracked)'} ${diagDesc(e.target)} n=${pts.size}`);   /* TEMP DIAGNOSTIC */
     if(pts.size < 2){
       pinch = null;
       /* A two-finger touch that landed (triggering PZ_PRE_ENGAGE above) and lifted without
