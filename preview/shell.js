@@ -2185,6 +2185,24 @@ if(window.visualViewport){
     return false;                                           /* nearest character exists but isn't under the pointer */
   }
   const pannable = (el, x, y) => !!(el && !(el.closest && el.closest(DRAG_SKIP)) && !overGlyph(x, y));
+  /* 2026-10: one-finger page pan that starts ON interactive content (a defined term/phrase, a
+     toolkit/frameworks/case-list button) while zoomed in. DRAG_SKIP + overGlyph() above exist so
+     a MOUSE click-drag on a term/button/text still clicks or selects instead of panning -- right
+     for a mouse, wrong for a finger: once zoomed (#pagezoom is position:fixed + overflow:hidden)
+     there is no native scrolling left, so pannable() refusing the touch meant NOTHING panned
+     from there. For a touch the tap/drag distinction is made by distance instead: a touch that
+     starts on any of these elements is tracked like any other, and only becomes a pan once it
+     moves past TOUCH_SLOP -- a tap that stays inside it never becomes a pan, so the element's
+     own click still fires; a drag that crosses it is a pan, and the click the browser would
+     otherwise deliver at the end of it is swallowed (see swallowClick below).
+     TOUCH_SKIP is the short list of things that genuinely own a touch gesture of their own and
+     must keep it: the framework canvas (own pan/pinch), floating windows and the dock (own
+     drag), resize handles, the column splitter (own capture-based drag), and form controls
+     (sliders, text entry). Mouse behaviour is untouched -- pannable() still decides for it. */
+  const TOUCH_SKIP = '.fwview,.peek,#dock,.rz,.splitter,input,textarea,select,[contenteditable="true"]';
+  const TOUCH_SLOP = 10;   /* CSS px a touch may wander and still count as a tap */
+  const touchPannable = el => !!(el && !(el.closest && el.closest(TOUCH_SKIP)));
+  let swallowClick = false, swallowTimer = 0;
   /* nearest ancestor (stopping at body) that can actually scroll on this axis; null means
      the page/pagezoom wrapper itself is the one with room to move */
   function scrollAncestor(el, axis){
@@ -2488,7 +2506,18 @@ if(window.visualViewport){
 
   /* click-drag empty space to pan */
   let pend = null;
+  /* Swallows the one click a browser would deliver at the end of a touch drag that started on a
+     term/button (see TOUCH_SLOP above) -- otherwise panning from a button would also press it
+     when the finger lifts. Capture phase on document, so it runs before any element's own click
+     handler. One-shot, and also expires on its own (see end() below), so it can never eat a
+     later, genuine tap. */
+  document.addEventListener('click', e=>{
+    if(!swallowClick) return;
+    swallowClick = false; clearTimeout(swallowTimer);
+    e.preventDefault(); e.stopImmediatePropagation();
+  }, true);
   document.addEventListener('pointerdown', e=>{
+    swallowClick = false; clearTimeout(swallowTimer);   /* a new gesture: any earlier drag's click is long gone */
     if(e.button !== 0) return;
     /* A two-finger touch pinch (globalPinch(), near the end of this file) must always own a
        gesture over a single-finger pan that happened to be starting at the same moment.
@@ -2497,7 +2526,11 @@ if(window.visualViewport){
        so this check is the second line of defense, for a pointerdown that lands fractionally
        after the pair was already complete. */
     if(window.PZ_PINCHING && window.PZ_PINCHING()) return;
-    if(!pannable(e.target, e.clientX, e.clientY)){
+    /* A finger on interactive content/text while zoomed is let through by distance, not refused
+       outright (see TOUCH_SLOP above); everything else keeps the original pannable() decision. */
+    const legacyOK = pannable(e.target, e.clientX, e.clientY);
+    const touchOwned = !legacyOK && e.pointerType === 'touch' && active && touchPannable(e.target);
+    if(!legacyOK && !touchOwned){
       lastDrag = `BLOCKED at (${e.clientX},${e.clientY}) target=${e.target.tagName}.${String(e.target.className||'').slice(0,30)}`;
       dbgUpdate();
       return;
@@ -2509,7 +2542,9 @@ if(window.visualViewport){
       id: e.pointerId, x:e.clientX, y:e.clientY, started:false, xEl, yEl,
       sl: xEl ? xEl.scrollLeft : window.scrollX,
       st: yEl ? yEl.scrollTop  : window.scrollY,
-      tx0: tx, ty0: ty
+      tx0: tx, ty0: ty,
+      slop: touchOwned ? TOUCH_SLOP : 4,   /* only the newly-allowed touch case gets the wider tap slop */
+      swallow: touchOwned                  /* ...and only it needs the end-of-drag click swallowed */
     };
   });
   document.addEventListener('pointermove', e=>{
@@ -2527,8 +2562,9 @@ if(window.visualViewport){
     if(e.pointerId !== pend.id) return;
     const dx = e.clientX - pend.x, dy = e.clientY - pend.y;
     if(!pend.started){
-      if(Math.hypot(dx, dy) < 4) return;
+      if(Math.hypot(dx, dy) < pend.slop) return;
       pend.started = true;
+      if(pend.swallow) swallowClick = true;   /* this touch is now a pan, not a tap: no click at the end of it */
       document.documentElement.classList.add('panning');
     }
     if(window.NAV_MARK) window.NAV_MARK();   /* a click-drag pan has no wheel/scroll events of its own */
@@ -2562,6 +2598,9 @@ if(window.visualViewport){
   const end = ()=>{
     if(pend && pend.started) document.documentElement.classList.remove('panning');
     pend = null;
+    /* Whatever click the finished drag produces arrives right after pointerup; give it a short
+       window to be swallowed, then stand down so no later tap is ever affected. */
+    if(swallowClick){ clearTimeout(swallowTimer); swallowTimer = setTimeout(()=>{ swallowClick = false; }, 400); }
   };
   window.addEventListener('pointerup', end);
   window.addEventListener('pointercancel', end);
