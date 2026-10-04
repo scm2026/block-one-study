@@ -2354,7 +2354,7 @@ if(window.visualViewport){
       + `style.transform: ${actualT || '(empty)'}  ${matches ? 'MATCHES state' : 'MISMATCH vs state'}\n`
       + `computed: ${compT}  pz.pos=${getComputedStyle(pz).position}\n`
       + `layer w measured=${lr.width.toFixed(0)} expected=${(layer.offsetWidth * (active ? k : 1)).toFixed(0)}  paintPending=${needsPaint}`;
-    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + 'JUMP DIAG (jd1):\n' + (jdTrail.length ? jdTrail.join('\n') : '(none)') + '\n' + `PINCH DIAG  build=jd1  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
+    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + 'JUMP DIAG (jd1):\n' + (jdTrail.length ? jdTrail.join('\n') : '(none)') + '\n' + `PINCH DIAG  build=jd2  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
       + ((window.PZ_PINCH_DIAG && window.PZ_PINCH_DIAG().tp) ? window.PZ_PINCH_DIAG().tp() : '')
       + pinchDiagText();
   }
@@ -3112,3 +3112,35 @@ if(window.visualViewport){
 })();
 
 render();
+
+/* TEMP DIAGNOSTIC (jd2, preview-only): keep every debug box visible under Safari's NATIVE pinch zoom.
+   The boxes are position:fixed in layout-viewport coordinates, so once vv.scale > 1 they fall outside the
+   visible slice. While zoomed, shrink each by 1/scale and re-place it at the same relative spot inside the
+   VISUAL viewport. No effect at scale 1 (transform cleared). Display only; touches nothing else. */
+(function(){
+  const IDS = ['pzdebug','peekdebug','pinchdiag','minidebug','frametiming','navdebug'];
+  const vv = window.visualViewport; if(!vv) return;
+  let baseW = document.documentElement.clientWidth, baseH = window.innerHeight, on = false, raf = 0;
+  function apply(){
+    raf = 0;
+    const s = vv.scale;
+    if(s < 1.01){
+      baseW = document.documentElement.clientWidth; baseH = window.innerHeight;
+      if(on){ on = false; IDS.forEach(id=>{ const e = document.getElementById(id); if(e){ e.style.transform = ''; e.style.transformOrigin = ''; } }); }
+      return;
+    }
+    on = true;
+    IDS.forEach(id=>{
+      const e = document.getElementById(id); if(!e || getComputedStyle(e).display === 'none') return;
+      e.style.transform = 'none'; e.style.transformOrigin = '0 0';
+      const r = e.getBoundingClientRect();
+      const fx = r.left / baseW, fy = r.top / baseH;
+      const tl = vv.offsetLeft + fx * vv.width, tt = vv.offsetTop + fy * vv.height;
+      /* fixed elements are laid out against the layout viewport, so offset by the visual viewport's origin */
+      e.style.transform = `translate(${(tl - r.left - vv.offsetLeft + vv.offsetLeft).toFixed(1)}px, ${(tt - r.top).toFixed(1)}px) scale(${(1 / s).toFixed(3)})`;
+    });
+  }
+  const kick = ()=>{ if(!raf) raf = requestAnimationFrame(apply); };
+  vv.addEventListener('resize', kick); vv.addEventListener('scroll', kick);
+  setInterval(()=>{ if(vv.scale >= 1.01 || on) kick(); }, 250);
+})();
