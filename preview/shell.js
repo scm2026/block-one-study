@@ -2327,7 +2327,7 @@ if(window.visualViewport){
   const frameTimingLog = [];
   const ftOverlay = document.createElement('div');
   ftOverlay.id = 'frametiming';
-  ftOverlay.style.cssText = 'position:fixed;bottom:4px;left:4px;z-index:99999;'
+  ftOverlay.style.cssText = 'position:fixed;bottom:4px;left:50%;transform:translateX(-50%);z-index:99999;'
     + 'background:rgba(0,70,0,.82);color:#fff;font:10px/1.4 monospace;padding:5px 8px;'
     + 'border-radius:4px;pointer-events:none;white-space:pre;max-width:360px';
   document.body.appendChild(ftOverlay);
