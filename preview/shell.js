@@ -1739,6 +1739,8 @@ function markAllTerms(){
      stops propagation, and it also fires when a scroll begins — so the card clears as
      soon as the reader moves on, which is what they mean by moving on. */
   document.addEventListener('touchstart', e=>{
+    if(fwPinned) return;                                   /* pinned: only the ✕ / Escape closes it */
+    if(e.target.closest && e.target.closest('.fwtip')) return;   /* touching the card is how you pin it */
     const t = e.target.closest && e.target.closest('.term, .fwnode');
     if(!t) fwTipHide();
   }, {capture:true, passive:true});
@@ -1747,11 +1749,21 @@ function markAllTerms(){
      On touch, where there is no hover, this is also how the card is opened at all. */
   document.addEventListener('click', e=>{
     const t = e.target.closest && e.target.closest('.term'); if(!t) return;
+    const g0 = TERMS[t.dataset.t];
+    if(g0 && tipTouchTap(fwTipAnchor === t, ()=>{
+      _tipKey = t.dataset.t;
+      fwTipShow(t, fwTipHTML(g0.d, g0, termHereText(g0), '', null, termRel(t)));
+    })) return;
     if(fwPinned && fwTipAnchor === t){ fwPin(false); fwTipHide(); return; }
     const g = TERMS[t.dataset.t]; if(!g) return;
     _tipKey = t.dataset.t;
     fwTipShow(t, fwTipHTML(g.d, g, termHereText(g), '', null, termRel(t)));
     fwPin(true);
+  });
+  /* touch: a tap inside an open peek card pins it */
+  document.addEventListener('click', e=>{
+    if(!termTouch || fwPinned || !fwTipEl || fwTipEl.hidden) return;
+    if(e.target.closest && e.target.closest('.fwtip')){ fwPin(true); fwPlace(); }
   });
 })();
 
@@ -1767,6 +1779,18 @@ function fwTip(){
     document.body.appendChild(fwTipEl);
   }
   return fwTipEl;
+}
+/* Touch "peek, then pin": first tap on a term/node peeks (closes on any touch elsewhere);
+   a second tap on the same one pins it. Once pinned, a touch never toggles it closed and
+   a different target just switches the card, keeping it pinned. Returns false for mouse. */
+function tipTouchTap(sameOpen, showFn){
+  if(!termTouch) return false;
+  const open = sameOpen && fwTipEl && !fwTipEl.hidden;
+  if(open){ if(!fwPinned){ fwPin(true); fwPlace(); } return true; }
+  const wasPinned = fwPinned;
+  showFn();
+  if(wasPinned){ fwPin(true); fwPlace(); }
+  return true;
 }
 function fwTipHide(){
   const t = fwTip(); t.dataset.on = "0"; t.hidden = true; fwTipAnchor = null;
@@ -1805,6 +1829,7 @@ function fwPlace(){
   let top = r.top - b.height - 9;
   if(top < vTop + pad) top = r.bottom + 9;               /* flip under when it won't fit */
   if(top + b.height > vTop + vH - pad) top = Math.max(vTop + pad, r.top - b.height - 9);
+  top = Math.max(vTop + pad, Math.min(top, vTop + vH - b.height - pad));   /* never leave the screen */
   t.style.left = Math.round(left) + 'px';
   t.style.top  = Math.round(top) + 'px';
 }
@@ -1812,6 +1837,7 @@ function fwTipShow(el, html){
   const t = fwTip();
   fwTipAnchor = el;
   t.innerHTML = html; t.hidden = false; t.dataset.on = "1";
+  t.classList.toggle('tp', !!termTouch);   /* touch: a peek card is touchable, so tapping it pins it */
   fwPlace();
 }
 /* The page moving under an anchored tooltip is a reason to MOVE the tooltip, never to
@@ -1825,8 +1851,9 @@ function fwTipFollow(){
   const vLeft = vv ? vv.offsetLeft : 0, vTop = vv ? vv.offsetTop : 0;
   const vW = vv ? vv.width : window.innerWidth, vH = vv ? vv.height : window.innerHeight;
   const r = fwTipAnchor.getBoundingClientRect();
-  if(r.bottom < vTop || r.top > vTop + vH ||
-     r.right < vLeft || r.left > vLeft + vW){ fwTipHide(); return; }
+  if(!(fwPinned && termTouch) &&
+     (r.bottom < vTop || r.top > vTop + vH ||
+      r.right < vLeft || r.left > vLeft + vW)){ fwTipHide(); return; }
   fwPlace();
 }
 function termFirst(p){ const m = String(p).match(/^.*?[.!?](?=\s|$)/); const t = m ? m[0] : String(p); return t.length > 240 ? t.slice(0,237) + '…' : t; }
@@ -1846,7 +1873,7 @@ function fwTipHTML(title, g, here, flag, ctx, rel){
     (flag ? `<span class="flag ${flag === 'closed by the facts' ? 'dropped':''}">${esc(flag)}</span>` : '') +
     (here ? `<div class="here"><span class="lb">In this case</span><p>${esc(here)}</p></div>` : '') +
     fwCtxHTML(ctx) +
-    (ctx && !fwPinned ? `<div class="hint">Click to keep this open</div>` : '');
+    (ctx && !fwPinned ? `<div class="hint">${termTouch ? 'Tap again to keep this open' : 'Click to keep this open'}</div>` : '');
 }
 
 /* ---------------- node context: case, provenance, arithmetic, consequence ---------- */
@@ -1895,7 +1922,7 @@ document.addEventListener('keydown', e=>{
   if(e.key === 'Escape' && fwPinned){ fwPin(false); fwTipHide(); }
 });
 document.addEventListener('mousedown', e=>{
-  if(!fwPinned) return;
+  if(!fwPinned || termTouch) return;
   /* leave .term alone here — its own click handler above decides whether that's a
      close (same term again) or a switch (a different term); this only closes on a
      genuine click to blank space or into the body text elsewhere */
@@ -1972,6 +1999,7 @@ function fwFindNode(f, id){
     const g = (under && under.closest && under.closest('.fwnode')) ||
               (e.target.closest && e.target.closest('.fwnode'));
     if(!g) return;
+    if(tipTouchTap(fwHiId === g.dataset.n, ()=>fwNodeTip(g))) return;
     /* Click pins, so the card can be read rather than balanced on a cursor. Set the
        pinned flag BEFORE building: the builder omits the "click to keep open" hint when
        pinned, and fwTipShow replaces innerHTML, so the close control is attached after. */
@@ -2013,6 +2041,7 @@ function fwFindNode(f, id){
      framework panel, where the pan handler's capture retargets the click. */
   svg.addEventListener('click', e=>{
     const g = e.target.closest('.fwnode'); if(!g) return;
+    if(tipTouchTap(fwHiId === g.dataset.n, ()=>canvasNodeTip(g))) return;
     if(fwPinned && fwHiId === g.dataset.n){ fwTipHide(); return; }
     fwPinned = true;
     canvasNodeTip(g);
@@ -2199,7 +2228,7 @@ if(window.visualViewport){
      must keep it: the framework canvas (own pan/pinch), floating windows and the dock (own
      drag), resize handles, the column splitter (own capture-based drag), and form controls
      (sliders, text entry). Mouse behaviour is untouched -- pannable() still decides for it. */
-  const TOUCH_SKIP = '.fwview,.peek,#dock,.rz,.splitter,input,textarea,select,[contenteditable="true"]';
+  const TOUCH_SKIP = '.fwtip,.fwview,.peek,#dock,.rz,.splitter,input,textarea,select,[contenteditable="true"]';
   const TOUCH_SLOP = 10;   /* CSS px a touch may wander and still count as a tap */
   const touchPannable = el => !!(el && !(el.closest && el.closest(TOUCH_SKIP)));
   let swallowClick = false, swallowTimer = 0;

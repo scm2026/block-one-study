@@ -529,6 +529,7 @@ button.chip[aria-pressed="true"]{box-shadow:0 0 0 2px var(--ground), 0 0 0 3px v
   border:1px solid var(--line-2); border-radius:3px; padding:10px 12px 11px;
   box-shadow:var(--shadow); pointer-events:none; opacity:0; transition:opacity .12s}
 .fwtip[data-on="1"]{opacity:1}
+.fwtip.tp[data-on="1"]{pointer-events:auto}
 .fwtip h5{font-family:"Spectral",Georgia,serif; font-size:14px; font-weight:600;
   margin:0 0 5px; color:var(--ink)}
 .fwtip p{margin:0; font-size:12.5px; line-height:1.5; color:var(--ink-2)}
