@@ -2344,7 +2344,7 @@ if(window.visualViewport){
       + `style.transform: ${actualT || '(empty)'}  ${matches ? 'MATCHES state' : 'MISMATCH vs state'}\n`
       + `computed: ${compT}  pz.pos=${getComputedStyle(pz).position}\n`
       + `layer w measured=${lr.width.toFixed(0)} expected=${(layer.offsetWidth * (active ? k : 1)).toFixed(0)}  paintPending=${needsPaint}`;
-    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + `PINCH DIAG  build=vv3  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
+    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + `PINCH DIAG  build=sp1  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
       + ((window.PZ_PINCH_DIAG && window.PZ_PINCH_DIAG().tp) ? window.PZ_PINCH_DIAG().tp() : '')
       + pinchDiagText();
   }
@@ -2475,9 +2475,23 @@ if(window.visualViewport){
   }
   window.PZ_VVSNAP = vvSnap; window.PZ_EVTRAIL = ()=>evTrail;
 
+  let pzSpacer = null;
   function engage(){
     startFrameTimingProbe();  /* TEMP DIAGNOSTIC -- see block above */
     const _b = vvSnap(), _y = scrollY, _x = scrollX;
+    /* Keep the document's scrollable size unchanged while zoom mode is on. Switching #pagezoom to
+       position:fixed takes the whole page out of flow, so the document collapses to one screen
+       tall; Safari then resets scrollY to 0 but leaves the visual viewport where it was, and for a
+       few frames the two disagree (device log: vvOffTop = -scrollY right after engage, first pinch
+       update garbage -> the visible jump, growing with scroll depth). The spacer is added BEFORE the
+       layout switch so there is never a collapsed frame, and removed in disengage(). */
+    if(!pzSpacer){
+      pzSpacer = document.createElement('div');
+      pzSpacer.id = 'pzspacer'; pzSpacer.setAttribute('aria-hidden', 'true');
+      pzSpacer.style.cssText = 'position:absolute;top:0;left:0;visibility:hidden;pointer-events:none;'
+        + `width:${document.documentElement.scrollWidth}px;height:${document.documentElement.scrollHeight}px`;
+      document.body.appendChild(pzSpacer);
+    }
     active = true;
     tx = -window.scrollX; ty = -window.scrollY; lastPaintTx = tx; lastPaintTy = ty;
     pz.style.position = 'fixed'; pz.style.inset = '0'; pz.style.overflow = 'hidden';
@@ -2497,6 +2511,7 @@ if(window.visualViewport){
        reset just done above. disengage() always wants its own state visible immediately. */
     needsPaint = false;
     applyTransformNow();
+    if(pzSpacer){ pzSpacer.remove(); pzSpacer = null; }
     window.scrollTo(gx, gy);
     evLog(`DISENGAGE by[${_who}] k=${_k.toFixed(2)} tx=${_tx.toFixed(0)} ty=${_ty.toFixed(0)} -> scrollTo(${gx.toFixed(0)},${gy.toFixed(0)}) landed=(${scrollX.toFixed(0)},${scrollY.toFixed(0)})${Math.abs(scrollY - gy) > 20 ? '  <<< DID NOT LAND' : ''} | ` + vvSnap());
   }
