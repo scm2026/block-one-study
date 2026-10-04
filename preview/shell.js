@@ -2236,6 +2236,13 @@ if(window.visualViewport){
   dbg.style.cssText = 'position:fixed;top:4px;left:4px;z-index:99999;background:rgba(0,0,0,.75);'
     + 'color:#fff;font:11px/1.5 monospace;padding:5px 8px;border-radius:4px;pointer-events:none;white-space:pre';
   document.body.appendChild(dbg);
+  /* TEMP DIAGNOSTIC: the pinch/cancel readout lives in its own box (bottom-right, clear of #pzdebug,
+     #peekdebug, #minidebug, the frame-timing box and the dock) so nothing sits on top of it. */
+  const dbg2 = document.createElement('div');
+  dbg2.id = 'pinchdiag';
+  dbg2.style.cssText = 'position:fixed;bottom:4px;right:70px;z-index:2147483000;background:rgba(0,0,0,.82);'
+    + 'color:#9fe;font:11px/1.45 monospace;padding:5px 8px;border-radius:4px;pointer-events:none;white-space:pre;max-width:60vw';
+  document.body.appendChild(dbg2);
   let ctrlTicks = 0, plainTicks = 0, lastWheel = 'none yet', lastDrag = 'none yet';
   /* TEMP DIAGNOSTIC (2026-10, preview-only, remove with the other readout lines): what zoomAt()
      was last asked for, and whether it changed anything. Plain numbers only -- formatted in
@@ -2302,7 +2309,8 @@ if(window.visualViewport){
       + `last drag: ${lastDrag}\n`
       + `style.transform: ${actualT || '(empty)'}  ${matches ? 'MATCHES state' : 'MISMATCH vs state'}\n`
       + `computed: ${compT}  pz.pos=${getComputedStyle(pz).position}\n`
-      + `layer w measured=${lr.width.toFixed(0)} expected=${(layer.offsetWidth * (active ? k : 1)).toFixed(0)}  paintPending=${needsPaint}`
+      + `layer w measured=${lr.width.toFixed(0)} expected=${(layer.offsetWidth * (active ? k : 1)).toFixed(0)}  paintPending=${needsPaint}`;
+    dbg2.textContent = `PINCH DIAG  build=ta2  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
       + pinchDiagText();
   }
   /* TEMP DIAGNOSTIC: the touch list globalPinch() is holding, its recent touch events, and what
@@ -2727,7 +2735,7 @@ if(window.visualViewport){
   /* TEMP DIAGNOSTIC (URL switch, off by default): ?ta=none forces touch-action:none on the whole page so a
      pinch from rest starts with no native handling allowed. One-finger native scroll is intentionally broken
      under this switch -- it exists only to tell "native pan claims the touch" from "layout switch cancels it". */
-  if(/[?&]ta=none\b/.test(location.search)){
+  if(/[?&#]ta=none\b/.test(location.search + location.hash)){
     const st = document.createElement('style');
     st.textContent = 'html, html *{touch-action:none !important}';
     document.head.appendChild(st);
