@@ -565,17 +565,14 @@ function buildRailToggle(){
      pinch-out tick lowers it, clamped so a long pinch saturates instead of running away
      and a couple of stray ticks near the middle don't flip it back and forth. Ordinary
      Ctrl+scroll fires the same event shape, so this quietly covers that path too. */
-  let gestureLevel = 0;
-  const GESTURE_MAX = 200, GESTURE_ON = 110, GESTURE_OFF = 60;
-  let gestureZoomedIn = false;
-  window.addEventListener('wheel', e=>{
-    if(!e.ctrlKey) return; /* plain scroll/pan, not a zoom gesture */
-    gestureLevel = Math.max(0, Math.min(GESTURE_MAX, gestureLevel - e.deltaY));
-    const was = gestureZoomedIn;
-    if(gestureLevel >= GESTURE_ON) gestureZoomedIn = true;
-    else if(gestureLevel <= GESTURE_OFF) gestureZoomedIn = false;
-    if(gestureZoomedIn !== was) sync();
-  }, {passive:true});
+  /* 2026-10 (input hand-off fix): the ctrl+wheel "zoom budget" that used to live here is retired. It existed
+     because a trackpad pinch / Ctrl+scroll zoomed the BROWSER invisibly, so the only clue was the wheel event
+     itself. Today pageZoom() consumes every ctrl+wheel (preventDefault) and drives our own exact zoom, so the
+     browser never zooms and the layout never changes. Keeping the budget made the rail collapse (re-flowing the
+     body card mid-gesture) on every trackpad pinch, and -- worst -- it latched: zoom in with the trackpad, zoom
+     back to exactly 1.0 with a touch pinch (or any other input), and the rail stayed collapsed because only
+     wheel events could ever clear it. Genuine browser zoom is still detected by autoZoomedIn()/innerWidth. */
+  const gestureZoomedIn = false;
 
   const b = document.createElement('button');
   b.id = 'railToggle'; b.type = 'button'; b.className = 'railToggle';
@@ -2366,7 +2363,7 @@ if(window.visualViewport){
       + `style.transform: ${actualT || '(empty)'}  ${matches ? 'MATCHES state' : 'MISMATCH vs state'}\n`
       + `computed: ${compT}  pz.pos=${getComputedStyle(pz).position}\n`
       + `layer w measured=${lr.width.toFixed(0)} expected=${(layer.offsetWidth * (active ? k : 1)).toFixed(0)}  paintPending=${needsPaint}`;
-    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + 'JUMP DIAG (jd1):\n' + (jdTrail.length ? jdTrail.join('\n') : '(none)') + '\n' + `PINCH DIAG  build=nodiag1  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
+    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + 'JUMP DIAG (jd1):\n' + (jdTrail.length ? jdTrail.join('\n') : '(none)') + '\n' + `PINCH DIAG  build=hand1  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
       + ((window.PZ_PINCH_DIAG && window.PZ_PINCH_DIAG().tp) ? window.PZ_PINCH_DIAG().tp() : '')
       + pinchDiagText();
   }
