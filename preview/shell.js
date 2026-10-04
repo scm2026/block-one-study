@@ -2310,7 +2310,7 @@ if(window.visualViewport){
       + `style.transform: ${actualT || '(empty)'}  ${matches ? 'MATCHES state' : 'MISMATCH vs state'}\n`
       + `computed: ${compT}  pz.pos=${getComputedStyle(pz).position}\n`
       + `layer w measured=${lr.width.toFixed(0)} expected=${(layer.offsetWidth * (active ? k : 1)).toFixed(0)}  paintPending=${needsPaint}`;
-    dbg2.textContent = `PINCH DIAG  build=tp1  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
+    dbg2.textContent = `PINCH DIAG  build=ho1  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
       + ((window.PZ_PINCH_DIAG && window.PZ_PINCH_DIAG().tp) ? window.PZ_PINCH_DIAG().tp() : '')
       + pinchDiagText();
   }
@@ -2699,6 +2699,52 @@ if(window.visualViewport){
   const pts = new Map();   // pointerId -> {x,y}, every touch pointer currently down
   let pinch = null;        // {d,k}: distance and PZ.k snapshot at the instant the pair formed
 
+  /* ===== 2026-10 Option B hybrid handoff: Safari cancels the Pointer Events stream of a pinch that
+     starts on a page whose effective touch-action still allows native pan, but keeps delivering
+     Touch Events for the same fingers until they lift (confirmed on device: 47 touchmoves over
+     1.4s after the pointercancel, finger distance still changing). So: the Pointer Events path stays
+     primary; ONLY when a live pinch is cancelled do we snapshot {d,k} and keep driving the same zoom
+     from two-finger touchmove distance/midpoint until a finger lifts. The snapshot is the ORIGINAL
+     pinch start (same formula as the pointer path: k0 * d/d0), so there is no jump at the handoff.
+     Never calls preventDefault (those touchmoves are non-cancelable once native pan owns them). */
+  let handoff = null;      // {d,k} while a cancelled pinch is being continued from Touch Events
+  const HO = {everArmed:false, armedAt:0, ptrMoves:0, kArm:1, moves:0, ended:''};
+  function armHandoff(){
+    handoff = {d: pinch.d, k: pinch.k};
+    HO.everArmed = true; HO.armedAt = performance.now(); HO.ptrMoves = diagMoves;
+    HO.kArm = window.PZ ? window.PZ.k : 1; HO.moves = 0; HO.ended = '';
+  }
+  function endHandoff(how){
+    if(!handoff) return;
+    handoff = null;
+    HO.ended = how + '@+' + Math.round(performance.now() - HO.armedAt) + 'ms';
+    /* same cleanup the pointer path does when a pinch ends: a barely-started pinch must not leave
+       the page stuck in fixed/"active" layout; no-op when a real zoom is in progress. */
+    if(window.PZ_DISENGAGE_IF_AT_REST) window.PZ_DISENGAGE_IF_AT_REST();
+    if(window.PZ_DBG) window.PZ_DBG();
+  }
+  document.addEventListener('touchstart', e=>{ if(handoff && e.touches.length === 1) endHandoff('new-touch'); }, {capture:true, passive:true});
+  document.addEventListener('touchmove', e=>{
+    if(!handoff) return;
+    if(e.touches.length < 2){ endHandoff('touchmove<2'); return; }
+    const a = e.touches[0], b = e.touches[1];
+    const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    if(handoff.d > 0 && window.PZ_ZOOM_AT){
+      HO.moves++;
+      window.PZ_ZOOM_AT(handoff.k * (d / handoff.d), (a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
+    }
+    if(window.PZ_DBG) window.PZ_DBG();
+  }, {capture:true, passive:true});
+  const hoTouchEnd = e=>{ if(handoff && e.touches.length < 2) endHandoff(e.type); };
+  document.addEventListener('touchend', hoTouchEnd, {capture:true, passive:true});
+  document.addEventListener('touchcancel', hoTouchEnd, {capture:true, passive:true});
+  /* safety net (see the §4.10 lesson in the engine doc): focus/visibility lost mid-gesture can deliver
+     no touchend at all. */
+  window.addEventListener('blur', ()=>endHandoff('blur'));
+  document.addEventListener('visibilitychange', ()=>{ if(document.hidden) endHandoff('hidden'); });
+  window.PZ_HANDOFF = ()=>({armed: !!handoff, ever: HO.everArmed, moves: HO.moves, ended: HO.ended});
+  /* ===== end handoff ===== */
+
   /* ===== TEMP DIAGNOSTIC (2026-10, preview-only; remove with the #pzdebug readout lines) =====
      For the "pinch gets stuck from one spot until reload" report: records which element each
      finger landed on, every lift/cancel, and the live touch list -- so a ghost finger (held in
@@ -2814,12 +2860,17 @@ if(window.visualViewport){
       diagInfo.delete(e.pointerId);
     }
     if(pts.size < 2){
+      /* Browser-cancelled live pinch -> continue it from Touch Events (see armHandoff above). Only a
+         touch pointercancel while a pinch is live arms it; a normal lift, or a one-finger native
+         scroll being cancelled, never does. */
+      if(e.type === 'pointercancel' && e.pointerType === 'touch' && pinch && !handoff) armHandoff();
       pinch = null;
       /* A two-finger touch that landed (triggering PZ_PRE_ENGAGE above) and lifted without
          ever becoming a real pinch -- e.g. a two-finger tap -- must not leave the page stuck
          in the fixed-position/"active" layout mode. No-op if a real zoom is already in
          progress. */
-      if(window.PZ_DISENGAGE_IF_AT_REST) window.PZ_DISENGAGE_IF_AT_REST();
+      /* ...but never mid-handoff: the gesture is still going, endHandoff() does this when it truly ends. */
+      if(!handoff && window.PZ_DISENGAGE_IF_AT_REST) window.PZ_DISENGAGE_IF_AT_REST();
     }
   };
   /* ===== TEMP DIAGNOSTIC (Option B probe, 2026-10, preview-only, READ-ONLY) =====
@@ -2873,16 +2924,18 @@ if(window.visualViewport){
     let t = `\nTOUCH EVENTS  ts=${TP.ts} tm=${TP.tm} te=${TP.te} tc=${TP.tc}  touches now=${TP.touches}  latest 2-finger d=${Math.round(TP.d2)}px  last touchmove cancelable=${TP.cancelable}`;
     if(TP.cur) t += '\n' + tpLine(TP.cur, 'NOW ');
     for(let i = TP.done.length - 1; i >= 0; i--) t += '\n' + tpLine(TP.done[i], 'prev');
+    t += `\nHANDOFF: ${handoff ? 'ARMED (touch events driving zoom)' : (HO.everArmed ? 'ended (' + (HO.ended || '-') + ')' : 'never armed')}`
+      + `  armed after ${HO.ptrMoves} pointer moves, k at arm=${HO.kArm.toFixed(2)}, touch-driven zoom calls=${HO.moves}, k now=${(window.PZ ? window.PZ.k : 1).toFixed(2)}`;
     return t;
   }
-  /* ===== end Option B probe ===== */
+  /* ===== end Option B probe =====
   document.addEventListener('touchcancel', e=>{ diagCnt.tcancel++; diagLog(`touchcancel cancelable=${e.cancelable} touches=${e.touches.length}`); }, {capture:true, passive:true});   /* TEMP DIAGNOSTIC */
   document.addEventListener('pointerup', up, {capture:true});
   document.addEventListener('pointercancel', up, {capture:true});
 
   /* Live touch-pointer count, read by buildDock()'s and pageZoom()'s own pointerdown handlers
      as their second line of defense against starting a drag/pan on top of an active pinch. */
-  window.PZ_PINCHING = ()=> pts.size >= 2;
+  window.PZ_PINCHING = ()=> pts.size >= 2 || !!handoff;
 })();
 
 /* TEMP DEBUG, preview only — requested live readout of the iPad mini's actual width/breakpoint
