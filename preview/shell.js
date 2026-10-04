@@ -2311,7 +2311,7 @@ if(window.visualViewport){
   function pinchDiagText(){
     const d = window.PZ_PINCH_DIAG ? window.PZ_PINCH_DIAG() : null;
     if(!d) return '';
-    return `\nCANCELS=${d.cnt.cancel} (landed w/ native pan allowed=${d.cnt.cancelPan}, none=${d.cnt.cancelNone})  ups=${d.cnt.up}  touchcancel=${d.cnt.tcancel}`
+    return `\n${window.__TA_NONE_TEST ? '*** ?ta=none TEST ACTIVE ***\n' : ''}CANCELS=${d.cnt.cancel} (landed w/ native pan allowed=${d.cnt.cancelPan}, none=${d.cnt.cancelNone})  ups=${d.cnt.up}  touchcancel=${d.cnt.tcancel}`
       + `\npts=${d.n} ids=[${d.ids.join(',')}]  pinch d0=${d.d0} d=${d.d} wantK=${d.want}  moves=${d.moves}`
       + `\nzoomAt calls=${zCalls} lastReq=${zReq.toFixed(2)}${zSame ? ' (clamped/no change)' : ''} k=${k.toFixed(2)}`
       + (d.trace.length ? '\n' + d.trace.join('\n') : '');
@@ -2724,6 +2724,15 @@ if(window.visualViewport){
     const str = ['x','y','z'].map(c => eff.has(c) ? c.toUpperCase() : '').join('') || '-';
     return str + '(' + raw.replace(/pan-/g,'p').replace(/pinch-zoom/,'Z') + ')';
   };
+  /* TEMP DIAGNOSTIC (URL switch, off by default): ?ta=none forces touch-action:none on the whole page so a
+     pinch from rest starts with no native handling allowed. One-finger native scroll is intentionally broken
+     under this switch -- it exists only to tell "native pan claims the touch" from "layout switch cancels it". */
+  if(/[?&]ta=none\b/.test(location.search)){
+    const st = document.createElement('style');
+    st.textContent = 'html, html *{touch-action:none !important}';
+    document.head.appendChild(st);
+    window.__TA_NONE_TEST = true;
+  }
   const diagInfo = new Map();   /* pointerId -> {t, ta, act} captured at touchstart */
   const diagCnt = {cancel:0, cancelPan:0, cancelNone:0, up:0, tcancel:0};
   function diagLog(s){
