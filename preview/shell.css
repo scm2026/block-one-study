@@ -72,6 +72,16 @@
    canvas, already touch-action:none) is unaffected for the same reason -- it already owns its
    own independent pinch via fwBindZoom() in shell.js and was never relying on this rule. */
 html{touch-action:pan-x pan-y}
+/* 2026-10: the html rule above only reaches a touch whose effective touch-action chain runs all the way
+   up to the viewport. The chain stops at the nearest SCROLL CONTAINER -- and overflow:hidden/auto/clip
+   boxes (cards, panels, tables, the dock) are scroll containers -- so a touch starting inside one never
+   saw html's value, its effective touch-action was `auto`, and Safari could take the two-finger gesture
+   for its own native pinch-zoom (page scale 1.2x+, persisting across reload, dock pushed off-screen)
+   instead of ours. Giving every element the same value closes that; :where() keeps specificity at zero so
+   every existing touch-action:none rule (.rz, .splitter, .peek.float header/.pbody, #dock .peek, the
+   framework canvas, html.pz-active #pagezoom *) still wins. Form controls are left alone: they need
+   their own native touch behaviour (slider thumb drag, text caret/selection). */
+:where(body, body *):not(input):not(textarea):not(select):not([contenteditable="true"]){touch-action:pan-x pan-y}
 body{margin:0; background:var(--ground); color:var(--ink);
   font-family:"Public Sans",ui-sans-serif,system-ui,sans-serif; font-size:15px; line-height:1.55}
 .wrap{max-width:1260px; margin:0 auto; padding-inline:16px; padding-block:26px 72px}
