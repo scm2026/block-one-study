@@ -2344,7 +2344,7 @@ if(window.visualViewport){
       + `style.transform: ${actualT || '(empty)'}  ${matches ? 'MATCHES state' : 'MISMATCH vs state'}\n`
       + `computed: ${compT}  pz.pos=${getComputedStyle(pz).position}\n`
       + `layer w measured=${lr.width.toFixed(0)} expected=${(layer.offsetWidth * (active ? k : 1)).toFixed(0)}  paintPending=${needsPaint}`;
-    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + `PINCH DIAG  build=vv2  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
+    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + `PINCH DIAG  build=vv3  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
       + ((window.PZ_PINCH_DIAG && window.PZ_PINCH_DIAG().tp) ? window.PZ_PINCH_DIAG().tp() : '')
       + pinchDiagText();
   }
@@ -2528,8 +2528,18 @@ if(window.visualViewport){
      ctrl-wheel path, which has no pointerdown-before-gesture moment to pre-engage at. */
   function preEngage(){
     if(active) return;
+    /* TEMP DIAGNOSTIC: where does the small jump at the start of a pinch come from? Follow one element
+       near screen centre through the engage -> first frames timeline and log how far it drifts while
+       k is still ~1 (any drift then is a layout/viewport jump, not zoom). */
+    const _ref = document.elementFromPoint(innerWidth / 2, innerHeight / 2);
+    const _vv = window.visualViewport, _r0 = _ref ? _ref.getBoundingClientRect().top : NaN;
+    const _snap = tag=>{ const t = _ref ? _ref.getBoundingClientRect().top : NaN;
+      return `${tag} drift=${(t - _r0).toFixed(1)}px k=${k.toFixed(2)} vvH=${_vv ? _vv.height.toFixed(0) : '?'} vvOffTop=${_vv ? _vv.offsetTop.toFixed(0) : '?'} innerH=${innerHeight}`; };
+    const _pre = _snap('before');
     engage();
-    applyTransformNow();   /* k is still K_MIN (1) here, so this is a pure re-parenting: the
+    applyTransformNow();
+    const _out = [_pre, _snap('sync after engage')];
+    [16, 50, 100, 200, 400].forEach((ms, i, arr)=>setTimeout(()=>{ _out.push(_snap('+' + ms + 'ms')); if(i === arr.length - 1) evLog('PINCH-START DRIFT: ' + _out.join(' | ')); }, ms));   /* k is still K_MIN (1) here, so this is a pure re-parenting: the
        resulting scale(1) translate(-scrollX,-scrollY) looks pixel-identical to the normal
        scrolled document it replaces -- nothing moves. Doing it synchronously, in the same
        tick as engage()'s position switch, means there is no frame where the layout has
