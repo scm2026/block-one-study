@@ -1,10 +1,10 @@
-/* Diagnostics switch (preview): the debug boxes are hidden unless html.diag is set. Turn on with ?diag=1 on the
-   URL (it sticks in this browser), turn off with ?diag=0. */
+/* Diagnostics switch (preview): the debug boxes are ON by default while we are testing. Hide them with ?diag=0 on
+   the URL (it sticks in this browser); bring them back with ?diag=1. */
 try{
-  if(/[?&]diag=1\b/.test(location.search)) localStorage.setItem('blockDiag', '1');
-  if(/[?&]diag=0\b/.test(location.search)) localStorage.removeItem('blockDiag');
-  if(localStorage.getItem('blockDiag') === '1') document.documentElement.classList.add('diag');
-}catch(err){}
+  if(/[?&]diag=0\b/.test(location.search)) localStorage.setItem('blockDiag', '0');
+  if(/[?&]diag=1\b/.test(location.search)) localStorage.removeItem('blockDiag');
+  if(localStorage.getItem('blockDiag') !== '0') document.documentElement.classList.add('diag');
+}catch(err){ document.documentElement.classList.add('diag'); }
 /* shell.js — one copy, shared by every block.
    Built by merge_shell.py from three drifted variants; every former
    difference is now driven by the data, not by which page it sits in. */
@@ -2363,7 +2363,7 @@ if(window.visualViewport){
       + `style.transform: ${actualT || '(empty)'}  ${matches ? 'MATCHES state' : 'MISMATCH vs state'}\n`
       + `computed: ${compT}  pz.pos=${getComputedStyle(pz).position}\n`
       + `layer w measured=${lr.width.toFixed(0)} expected=${(layer.offsetWidth * (active ? k : 1)).toFixed(0)}  paintPending=${needsPaint}`;
-    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + 'JUMP DIAG (jd1):\n' + (jdTrail.length ? jdTrail.join('\n') : '(none)') + '\n' + `PINCH DIAG  build=gest1  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
+    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + 'JUMP DIAG (jd1):\n' + (jdTrail.length ? jdTrail.join('\n') : '(none)') + '\n' + `PINCH DIAG  build=gest3  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
       + ((window.PZ_PINCH_DIAG && window.PZ_PINCH_DIAG().tp) ? window.PZ_PINCH_DIAG().tp() : '')
       + pinchDiagText();
   }
@@ -2601,7 +2601,7 @@ if(window.visualViewport){
   window.addEventListener('wheel', e=>{
     lastWheel = `ctrlKey=${e.ctrlKey} deltaX=${e.deltaX.toFixed(1)} deltaY=${e.deltaY.toFixed(1)} deltaMode=${e.deltaMode}`;
     if(!e.ctrlKey){ dbgUpdate(); return; }
-    ctrlTicks++;
+    ctrlTicks++; try{ if(window.PZ_GESTURE && window.PZ_GESTURE().on) window.PZ_GESTURE().wheelDuring++; }catch(_){}
     if(e.target && e.target.closest && e.target.closest('.fwview')){ dbgUpdate(); return; } /* the framework canvas owns its own pinch */
     e.preventDefault();
     zoomAt(k * (e.deltaY < 0 ? 1.08 : 1 / 1.08), e.clientX, e.clientY);
@@ -2647,8 +2647,9 @@ if(window.visualViewport){
      (zoomAt) from e.scale, anchored at the cursor. A touch pinch that the pointer/touch paths already own
      (PZ_PINCHING) is only prevented, never double-driven. The framework canvas keeps owning its pinch: native zoom
      is still blocked over it, the page just isn't zoomed. */
-  const GE = {start:0, change:0, end:0, drove:0, ignored:0, over:0};
+  const GE = {start:0, change:0, end:0, drove:0, ignored:0, over:0, scale:0, maxScale:0, minScale:99, xy:'-', kReq:0, wheelDuring:0, firstScale:0, nativeXY:'-'};
   window.PZ_GESTURE = ()=>GE;
+  Object.defineProperty(GE, 'on', {get:()=>geOn, enumerable:false});
   let geK0 = 1, geOn = false, geLast = null;
   document.addEventListener('pointermove', e=>{ if(e.pointerType !== 'touch') geLast = {x:e.clientX, y:e.clientY}; }, {capture:true, passive:true});
   const geXY = e=>{
@@ -2657,7 +2658,7 @@ if(window.visualViewport){
   };
   const gePinching = ()=>!!(window.PZ_PINCHING && window.PZ_PINCHING());
   document.addEventListener('gesturestart', e=>{
-    GE.start++; e.preventDefault();
+    GE.start++; GE.change = 0; GE.firstScale = 0; GE.maxScale = 0; GE.minScale = 99; e.preventDefault();
     if(e.target && e.target.closest && e.target.closest('.fwview')){ geOn = false; GE.over++; return; }
     geK0 = k; geOn = true;
   }, {passive:false});
@@ -2666,6 +2667,9 @@ if(window.visualViewport){
     if(!geOn) return;
     if(gePinching()){ GE.ignored++; return; }
     const p = geXY(e);
+    if(GE.change === 1 || !GE.firstScale) GE.firstScale = e.scale;
+    GE.scale = e.scale; GE.maxScale = Math.max(GE.maxScale, e.scale); GE.minScale = Math.min(GE.minScale, e.scale); GE.kReq = geK0 * e.scale;
+    GE.nativeXY = `${e.clientX},${e.clientY}`; GE.xy = `${Math.round(p.x)},${Math.round(p.y)}`;
     if(!active && geK0 * e.scale > K_MIN && window.PZ_PRE_ENGAGE) window.PZ_PRE_ENGAGE();
     zoomAt(geK0 * e.scale, p.x, p.y); GE.drove++;
     dbgUpdate();
@@ -3116,7 +3120,7 @@ if(window.visualViewport){
     let t = `\nTOUCH EVENTS  ts=${TP.ts} tm=${TP.tm} te=${TP.te} tc=${TP.tc}  touches now=${TP.touches}  latest 2-finger d=${Math.round(TP.d2)}px  last touchmove cancelable=${TP.cancelable}`;
     if(TP.cur) t += '\n' + tpLine(TP.cur, 'NOW ');
     for(let i = TP.done.length - 1; i >= 0; i--) t += '\n' + tpLine(TP.done[i], 'prev');
-    { const g = window.PZ_GESTURE ? window.PZ_GESTURE() : null; if(g) t += `\nGESTURE EVENTS (Safari): start=${g.start} change=${g.change} end=${g.end} drove-zoom=${g.drove} ignored(touch owns)=${g.ignored} over-canvas=${g.over}`; }
+    { const g = window.PZ_GESTURE ? window.PZ_GESTURE() : null; if(g) t += `\nGESTURE EVENTS (Safari): start=${g.start} change=${g.change} end=${g.end} drove-zoom=${g.drove} ignored(touch owns)=${g.ignored} over-canvas=${g.over}\n   last gesture: first scale=${(+g.firstScale).toFixed(3)} now=${(+g.scale).toFixed(3)} min=${g.minScale === 99 ? '-' : (+g.minScale).toFixed(3)} max=${(+g.maxScale).toFixed(3)} -> k requested ${(+g.kReq).toFixed(2)}  event xy=${g.nativeXY} used xy=${g.xy}  ctrl-wheel ticks during gesture=${g.wheelDuring}`; }
     t += `\nHANDOFF: ${handoff ? 'ARMED (touch events driving zoom)' : (HO.everArmed ? 'ended (' + (HO.ended || '-') + ')' : 'never armed')}`
       + `  armed after ${HO.ptrMoves} pointer moves, k at arm=${HO.kArm.toFixed(2)}, touch-driven zoom calls=${HO.moves}, k now=${(window.PZ ? window.PZ.k : 1).toFixed(2)}`;
     return t;
