@@ -104,16 +104,17 @@ const isGated = (cid, i, q) => revealMode === 'practice' && !revealed.has(rkey(c
 /* The casebook's own framework (SRCFW, per case): one structured outline, used both in the side window
    and inline on the Framework step. */
 const SF_FROM = {given:'Handed to you in the prompt', ask:'The interviewer gives it only if you ask', calc:'You work it out from other numbers', none:'The case never supplies it'};
-function sfNode(c){ return c; }
+const SF_CHG = {add:'Added by us', move:'Moved by us', ren:'Renamed by us', cut:'Removed by us'};
 function sfFind(root, key){ let n = root; key.split('.').slice(1).forEach(i=>{ n = n.k[+i]; }); return n; }
 function sfWalk(n, key, fn){ fn(n, key); (n.k||[]).forEach((x,i)=>sfWalk(x, key + '.' + i, fn)); }
-function sfRoot(f){ return Object.assign({}, f.hyp, {k: f.kids}); }
-/* the casebook's own framework as a left-to-right tree. step = the 1-based step that lights it up
-   (0 = light everything: the Framework step itself, where the whole structure is being built) */
-function srcFwHTML(id, inline){
+function sfRoot(f, mode){ const t = f[mode] || f.printed; return Object.assign({}, t.hyp, {k: t.kids}); }
+/* The casebook's own framework as a left-to-right tree, in two versions: exactly as printed, and our improved
+   version built on it. Nodes light up for the step you are on (all of them on the Framework step itself). */
+function srcFwHTML(id, inline, mode){
   const f = (typeof SRCFW !== 'undefined') && SRCFW[id];
   if(!f) return `<p class="sfnone">This case has no casebook framework added here yet. The pilot covers Army Hotel and Breast Cancer Surgery.</p>`;
-  const root = sfRoot(f), stepNo = (inline || si + 1 === f.buildStep) ? 0 : si + 1;
+  mode = mode === 'improved' ? 'improved' : 'printed';
+  const root = sfRoot(f, mode), stepNo = (inline || si + 1 === f.buildStep) ? 0 : si + 1;
   const lit = [];
   sfWalk(root, 'h', (n,k)=>{ if(stepNo && (n.u||[]).includes(stepNo) && k !== 'h') lit.push(n.t); });
   const cls = n => {
@@ -126,43 +127,60 @@ function srcFwHTML(id, inline){
   const hasLitKid = n => (n.k||[]).some(x=>(x.u||[]).includes(stepNo) || hasLitKid(x));
   const node = (n, key) => {
     const kids = n.k || [];
-    const c0 = cls(n) + (stepNo && !((n.u||[]).includes(stepNo)) && hasLitKid(n) ? ' path' : '');
+    const c0 = cls(n) + (stepNo && !((n.u||[]).includes(stepNo)) && hasLitKid(n) ? ' path' : '') + (n.chg ? ' chg-'+n.chg : '');
     return `<li${kids.length?' class="hk"':''}><button type="button" class="sfnode ${c0}${key==='h'?' root':''}" data-k="${key}">` +
-      `<span class="sfname">${esc(n.t)}</span>${n.from?`<i class="sfsrc sf-${n.from}" title="${esc(SF_FROM[n.from])}"></i>`:''}</button>` +
+      `<span class="sfname">${esc(n.t)}</span>${n.chg?`<b class="sfchg" title="${esc(SF_CHG[n.chg])}">${n.chg==='add'?'+':n.chg==='move'?'↑':'~'}</b>`:''}${n.from?`<i class="sfsrc sf-${n.from}" title="${esc(SF_FROM[n.from])}"></i>`:''}</button>` +
       (kids.length ? `<ul>${kids.map((x,i)=>node(x, key + '.' + i)).join('')}</ul>` : '') + `</li>`;
   };
   const first = stepNo ? (()=>{ let r = null; sfWalk(root,'h',(n,k)=>{ if(!r && k!=='h' && (n.u||[]).includes(stepNo)) r = k; }); return r || 'h'; })() : 'h';
-  const html = `<div class="srcfw${inline?' inl':''}" data-case="${esc(id)}">
+  const t = f[mode];
+  const html = `<div class="srcfw${inline?' inl':''}" data-case="${esc(id)}" data-mode="${mode}">
     <p class="sfmeta">${esc(f.src)}</p>
+    <div class="sftabs" role="group" aria-label="Which version of the framework">
+      <button type="button" class="sftab" data-mode="printed" aria-pressed="${mode==='printed'}">As printed in the book</button>
+      <button type="button" class="sftab" data-mode="improved" aria-pressed="${mode==='improved'}">Our improved version</button></div>
+    <p class="sfnote">${mode==='printed' ? `Structure and wording exactly as the casebook prints them. The book opens with “${esc(f.lead)}”.` : esc(t.note)}</p>
     <div class="sfscroll"><ul class="sftree">${node(root,'h')}</ul></div>
-    <div class="sfkey"><span><i class="sfsrc sf-given"></i>in the prompt</span><span><i class="sfsrc sf-ask"></i>only if you ask</span><span><i class="sfsrc sf-calc"></i>you work it out</span><span><i class="sfsrc sf-none"></i>never supplied</span>${stepNo?'<span><b class="sfl lit">lit</b>used on this step</span><span><b class="sfl seen">seen</b>used on another step</span>':''}</div>
-    ${stepNo?`<p class="sflitline">${lit.length?'Lit on this step: <b>'+lit.map(esc).join('</b>, <b>')+'</b>.':'Nothing from the casebook framework is used on this step.'}</p>`:''}
+    <div class="sfkey"><span><i class="sfsrc sf-given"></i>in the prompt</span><span><i class="sfsrc sf-ask"></i>only if you ask</span><span><i class="sfsrc sf-calc"></i>you work it out</span><span><i class="sfsrc sf-none"></i>never supplied</span>${mode==='improved'?'<span><b class="sfchg">+</b>added <b class="sfchg">↑</b>moved <b class="sfchg">~</b>renamed</span>':''}${stepNo?'<span><b class="sfl lit">lit</b>used on this step</span><span><b class="sfl seen">seen</b>used on another step</span>':''}</div>
+    ${stepNo?`<p class="sflitline">${lit.length?'Lit on this step: <b>'+lit.map(esc).join('</b>, <b>')+'</b>.':'Nothing from this framework is used on this step.'}</p>`:''}
     <div class="sfdet">${sfDetailHTML(sfFind(root, first), first)}</div>
   </div>`;
   return html.replace(`data-k="${first}"`, `data-k="${first}" aria-pressed="true"`);
 }
 function sfDetailHTML(n, key){
   const used = (n.u||[]).length ? 'Used on step ' + n.u.join(', ') : (n.from === 'none' ? 'Not used in this case' : '');
+  const kids = (n.k||[]).length;
   return `<h5>${esc(n.t)}</h5>
     ${n.from?`<span class="sfpill sf-${n.from}">${esc(SF_FROM[n.from])}</span>`:''}${used?`<span class="sfused">${esc(used)}</span>`:''}
     ${n.def?`<div><span class="lab">What it means</span><p>${esc(n.def)}</p></div>`:''}
     ${n.why?`<div><span class="lab">Why you need it</span><p>${esc(n.why)}</p></div>`:''}
-    ${n.n?`<div><span class="lab">In this case</span><p>${esc(n.n)}</p></div>`:''}`;
+    ${kids&&n.split?`<div class="sfsplit"><span class="lab">Why it branches into ${esc(n.k.map(x=>x.t.replace(/:.*$/,'')).join(', '))}</span><p>${esc(n.split)}</p></div>`:''}
+    ${n.n?`<div><span class="lab">In this case</span><p>${esc(n.n)}</p></div>`:''}
+    ${n.chg?`<div class="sfchgwhy"><span class="lab">${esc(SF_CHG[n.chg])}: why</span><p>${esc(n.chgwhy||'')}</p></div>`:''}`;
 }
 function sfFit(box){
   const sc = box.querySelector('.sfscroll'); if(!sc) return;
   const t = sc.querySelector('.sftree'); t.style.zoom = 1;
   const need = t.scrollWidth, have = sc.clientWidth;
-  if(have > 40 && need > have) t.style.zoom = Math.max(.55, have / need);
+  if(have > 40 && need > have) t.style.zoom = Math.max(.5, have / need);
 }
 document.addEventListener('click', e=>{
+  const tb = e.target.closest && e.target.closest('.sftab');
+  if(tb){
+    const box = tb.closest('.srcfw'); if(!box || tb.dataset.mode === box.dataset.mode) return;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = srcFwHTML(box.dataset.case, box.classList.contains('inl'), tb.dataset.mode);
+    const nb = tmp.firstElementChild; box.replaceWith(nb);
+    try{ markTerms(nb.querySelector('.sfdet')); }catch(err){}
+    sfFit(nb); return;
+  }
   const b = e.target.closest && e.target.closest('.sfnode'); if(!b) return;
   const box = b.closest('.srcfw'); const f = SRCFW[box.dataset.case]; if(!f) return;
   box.querySelectorAll('.sfnode[aria-pressed]').forEach(x=>x.removeAttribute('aria-pressed'));
   b.setAttribute('aria-pressed','true');
   const det = box.querySelector('.sfdet');
-  det.innerHTML = sfDetailHTML(sfFind(sfRoot(f), b.dataset.k), b.dataset.k);
-  if(typeof markTerms === 'function') markTerms(det);
+  det.innerHTML = sfDetailHTML(sfFind(sfRoot(f, box.dataset.mode), b.dataset.k), b.dataset.k);
+  try{ markTerms(det); }catch(err){}
 });
 function drawSrcFw(c){
   const w = document.querySelector('#peekSrc .pbody'); if(!w) return;
@@ -172,9 +190,8 @@ function drawSrcFw(c){
   if(pc) pc.textContent = has ? 'book' : 'none';
   if(has){
     try{ markTerms(w.querySelector('.sfdet')); }catch(err){}
-    const box = w.querySelector('.srcfw');
-    sfFit(box);
-    if(window.ResizeObserver){ if(drawSrcFw._ro) drawSrcFw._ro.disconnect(); drawSrcFw._ro = new ResizeObserver(()=>sfFit(box)); drawSrcFw._ro.observe(w); }
+    sfFit(w.querySelector('.srcfw'));
+    if(window.ResizeObserver){ if(drawSrcFw._ro) drawSrcFw._ro.disconnect(); drawSrcFw._ro = new ResizeObserver(()=>{ const b = w.querySelector('.srcfw'); if(b) sfFit(b); }); drawSrcFw._ro.observe(w); }
   }
 }
 function renderV2(c, s, v){
@@ -1285,6 +1302,17 @@ function drawConcept(){
   el.className = 'cpanel';
   const m = d.math;
   const fmt = t => esc(t).replace(/\{([^|{}]+)\|([^{}]+)\}/g, '<span class="frac"><span>$1</span><span>$2</span></span>');
+  /* every plain symbol in a formula (F, p, Q*, R(p)...) can be hovered or tapped to see what it stands for,
+     using the same description the variable tree gives it */
+  const symMap = {};
+  const collect = n => { if(/^[A-Za-zπ][A-Za-z0-9_*()]*$/.test(n.s)) symMap[n.s] = n.d; (n.k||[]).forEach(collect); };
+  if(m) m.forms.forEach(f=>collect(f.tree));
+  const symNames = Object.keys(symMap).sort((a,b)=>b.length-a.length);
+  const symRe = symNames.length ? new RegExp('(^|[^A-Za-z0-9_])(' + symNames.map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|') + ')(?![A-Za-z0-9_])','g') : null;
+  const wrapSym = h => symRe ? h.replace(symRe, (all, pre, sy)=>`${pre}<span class="msym" tabindex="0" role="button" aria-label="${esc(sy)}: ${esc(symMap[sy])}">${sy}<span class="mtip"><b>${sy}</b> ${esc(symMap[sy])}</span></span>`) : h;
+  const fmtF = t => { let out = '', last = 0; const re = /\{([^|{}]+)\|([^{}]+)\}/g; let x;
+    while((x = re.exec(t))){ out += wrapSym(esc(t.slice(last, x.index))) + `<span class="frac"><span>${wrapSym(esc(x[1]))}</span><span>${wrapSym(esc(x[2]))}</span></span>`; last = x.index + x[0].length; }
+    return out + wrapSym(esc(t.slice(last))); };
   const ltree = n => `<li${(n.k&&n.k.length)?' class="hk"':''}><div class="mnode"><b>${fmt(n.s)}</b><span>${fmt(n.d||'')}</span>${n.op?`<em>${esc(n.op)}</em>`:''}</div>${(n.k&&n.k.length)?`<ul>${n.k.map(ltree).join('')}</ul>`:''}</li>`;
   const bl = a => { let out = '<ul>'; a.forEach(x=>{ if(Array.isArray(x)) out += bl(x).replace(/^<ul>/, '<ul class="sub">'); else out += `<li>${fmt(x)}`+'</li>'; }); return out + '</ul>'; };
   /* data nests a child list right after its parent line; flatten that into parent > children */
@@ -1292,7 +1320,7 @@ function drawConcept(){
   const li = x => Array.isArray(x) ? `<li>${fmt(x[0])}<ul>${x[1].map(li).join('')}</ul></li>` : `<li>${fmt(x)}</li>`;
   const bul = a => `<ul class="bl">${nest(a).map(li).join('')}</ul>`;
   const mathHTML = m ? m.forms.map(f=>`<div class="cform">${f.label?`<span class="lab">The math: ${esc(f.label)}</span>`:'<span class="lab">The math</span>'}
-      <div class="cformula cmath">${fmt(f.f)}</div>
+      <div class="cformula cmath">${fmtF(f.f)}</div>
       <ul class="mtree">${ltree(f.tree)}</ul></div>`).join('')
     : (d.formula?`<span class="lab">The shape of it</span><div class="cformula">${esc(d.formula)}</div>`:'');
   const trio = (d.here||d.big||d.without) ? `<div class="ctrio">
@@ -1314,6 +1342,7 @@ function drawConcept(){
     ${m?`<div class="cmathrow">${mathHTML}</div>`:''}${bullets}${trio}`;
   box.appendChild(el);
 }
+document.addEventListener('click', e=>{ const ms = e.target.closest && e.target.closest('.msym'); document.querySelectorAll('.msym.on').forEach(x=>{ if(x !== ms) x.classList.remove('on'); }); if(ms) ms.classList.toggle('on'); });
 document.getElementById('toolkit').addEventListener('click', e=>{
   const ch = e.target.closest('.chip'); if(!ch || !ch.dataset.c) return;
   conceptOpen = (conceptOpen === ch.dataset.c) ? null : ch.dataset.c;
