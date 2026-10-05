@@ -1,10 +1,11 @@
 /* Diagnostics switch (preview): the debug boxes are ON by default while we are testing. Hide them with ?diag=0 on
    the URL (it sticks in this browser); bring them back with ?diag=1. */
 try{
-  if(/[?&]diag=0\b/.test(location.search)) localStorage.setItem('blockDiag', '0');
-  if(/[?&]diag=1\b/.test(location.search)) localStorage.removeItem('blockDiag');
-  if(localStorage.getItem('blockDiag') !== '0') document.documentElement.classList.add('diag');
-}catch(err){ document.documentElement.classList.add('diag'); }
+  /* diagnostics are OFF by default; ?diag=1 turns them on and keeps them on, ?diag=0 turns them off again */
+  if(/[?&]diag=1\b/.test(location.search)) localStorage.setItem('blockDiag', '1');
+  if(/[?&]diag=0\b/.test(location.search)) localStorage.removeItem('blockDiag');
+  if(localStorage.getItem('blockDiag') === '1') document.documentElement.classList.add('diag');
+}catch(err){ if(/[?&]diag=1\b/.test(location.search)) document.documentElement.classList.add('diag'); }
 /* shell.js — one copy, shared by every block.
    Built by merge_shell.py from three drifted variants; every former
    difference is now driven by the data, not by which page it sits in. */
