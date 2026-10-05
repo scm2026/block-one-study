@@ -798,3 +798,9 @@ tspan.term{border-bottom:0; text-decoration:underline dotted; text-decoration-th
 
 /* Diagnostics switch: hide every temporary debug box unless html.diag (see top of shell.js). */
 html:not(.diag) :is(#peekdebug,#navdebug,#pzdebug,#pinchdiag,#frametiming,#minidebug){display:none !important}
+
+/* NATIVE-ZOOM MODE (see pageZoom() in shell.js): while the browser's own zoom is on, give every input back the browser's
+   pinch -- the page-wide pan-only rule above would otherwise stop the user zooming BACK OUT. Window chrome, resize
+   handles, the splitter and the framework canvas keep their own touch-action. */
+html.nativeZoom, html.nativeZoom body{touch-action:auto}
+html.nativeZoom body :not(.peek):not(.peek *):not(.rz):not(.splitter):not(.fwview):not(.fwview *):not(input):not(textarea):not(select):not([contenteditable="true"]){touch-action:auto}

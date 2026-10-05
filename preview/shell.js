@@ -2363,7 +2363,7 @@ if(window.visualViewport){
       + `style.transform: ${actualT || '(empty)'}  ${matches ? 'MATCHES state' : 'MISMATCH vs state'}\n`
       + `computed: ${compT}  pz.pos=${getComputedStyle(pz).position}\n`
       + `layer w measured=${lr.width.toFixed(0)} expected=${(layer.offsetWidth * (active ? k : 1)).toFixed(0)}  paintPending=${needsPaint}`;
-    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + 'JUMP DIAG (jd1):\n' + (jdTrail.length ? jdTrail.join('\n') : '(none)') + '\n' + `PINCH DIAG  build=gest3  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
+    dbg2.textContent = `VIEWPORT: ${vvSnap()}\n` + (evTrail.length ? evTrail.join('\n') + '\n' : '') + 'JUMP DIAG (jd1):\n' + (jdTrail.length ? jdTrail.join('\n') : '(none)') + '\n' + `PINCH DIAG  build=nat1  url-query="${location.search}${location.hash}"  ta-none-test=${window.__TA_NONE_TEST ? 'ON' : 'off'}`
       + ((window.PZ_PINCH_DIAG && window.PZ_PINCH_DIAG().tp) ? window.PZ_PINCH_DIAG().tp() : '')
       + pinchDiagText();
   }
@@ -2535,6 +2535,7 @@ if(window.visualViewport){
     evLog(`DISENGAGE by[${_who}] k=${_k.toFixed(2)} tx=${_tx.toFixed(0)} ty=${_ty.toFixed(0)} -> scrollTo(${gx.toFixed(0)},${gy.toFixed(0)}) landed=(${scrollX.toFixed(0)},${scrollY.toFixed(0)})${Math.abs(scrollY - gy) > 20 ? '  <<< DID NOT LAND' : ''} | ` + vvSnap());
   }
   function zoomAt(nextK, cx, cy){
+    if(nativeMode) return;   /* browser's own zoom is on: never stack ours on top (see nativeMode below) */
     zCalls++; zReq = nextK; tySrc = `zoomAt(k=${nextK.toFixed(2)}, cx=${cx.toFixed(0)}, cy=${cy.toFixed(0)})`;   /* TEMP DIAGNOSTIC */
     { const _n = performance.now();
       if(active && jdLastZT && _n - jdLastZT < 400 && Math.hypot(cx - jdLastCx, cy - jdLastCy) > 20) jd(`MIDPOINT JUMP ${Math.round(Math.hypot(cx - jdLastCx, cy - jdLastCy))}px (${jdLastCx.toFixed(0)},${jdLastCy.toFixed(0)})->(${cx.toFixed(0)},${cy.toFixed(0)}) k=${k.toFixed(2)}->${nextK.toFixed(2)}`);
@@ -2564,7 +2565,7 @@ if(window.visualViewport){
      branch is simply skipped for touch -- that branch stays exactly as it was for the trackpad
      ctrl-wheel path, which has no pointerdown-before-gesture moment to pre-engage at. */
   function preEngage(){
-    if(active) return;
+    if(active || nativeMode) return;
     /* TEMP DIAGNOSTIC: where does the small jump at the start of a pinch come from? Follow one element
        near screen centre through the engage -> first frames timeline and log how far it drifts while
        k is still ~1 (any drift then is a layout/viewport jump, not zoom). */
@@ -2603,6 +2604,7 @@ if(window.visualViewport){
     if(!e.ctrlKey){ dbgUpdate(); return; }
     ctrlTicks++; try{ if(window.PZ_GESTURE && window.PZ_GESTURE().on) window.PZ_GESTURE().wheelDuring++; }catch(_){}
     if(e.target && e.target.closest && e.target.closest('.fwview')){ dbgUpdate(); return; } /* the framework canvas owns its own pinch */
+    if(nativeMode){ dbgUpdate(); return; }   /* browser zoom is on: let it zoom back out natively */
     e.preventDefault();
     zoomAt(k * (e.deltaY < 0 ? 1.08 : 1 / 1.08), e.clientX, e.clientY);
     dbgUpdate();
@@ -2658,12 +2660,16 @@ if(window.visualViewport){
   };
   const gePinching = ()=>!!(window.PZ_PINCHING && window.PZ_PINCHING());
   document.addEventListener('gesturestart', e=>{
-    GE.start++; GE.change = 0; GE.firstScale = 0; GE.maxScale = 0; GE.minScale = 99; e.preventDefault();
+    GE.start++; GE.change = 0; GE.firstScale = 0; GE.maxScale = 0; GE.minScale = 99;
+    if(nativeMode){ geOn = false; return; }   /* browser zoom is on: leave its gestures alone so it can zoom back out */
+    e.preventDefault();
     if(e.target && e.target.closest && e.target.closest('.fwview')){ geOn = false; GE.over++; return; }
     geK0 = k; geOn = true;
   }, {passive:false});
   document.addEventListener('gesturechange', e=>{
-    GE.change++; e.preventDefault();
+    GE.change++;
+    if(nativeMode) return;
+    e.preventDefault();
     if(!geOn) return;
     if(gePinching()){ GE.ignored++; return; }
     const p = geXY(e);
@@ -2674,8 +2680,35 @@ if(window.visualViewport){
     zoomAt(geK0 * e.scale, p.x, p.y); GE.drove++;
     dbgUpdate();
   }, {passive:false});
-  const geEnd = e=>{ GE.end++; e.preventDefault(); geOn = false; if(!gePinching()) disengageIfAtRest(); };
+  const geEnd = e=>{ GE.end++; if(nativeMode) return; e.preventDefault(); geOn = false; if(!gePinching()) disengageIfAtRest(); };
   document.addEventListener('gestureend', geEnd, {passive:false});
+
+  /* 2026-10 NATIVE-ZOOM MODE. Device logs (iPad, trackpad pinch) showed Safari zooming the page itself with NO event
+     reaching the page at all (no wheel, no gesture events -- only visualViewport.scale changing), after which a touch
+     pinch engaged OUR zoom on top of it: the two stacked ("hyper zoom"), and every engage landed with a jump equal to
+     visualViewport.offsetTop (drift -206.9px vs offset 207; -73.3 vs 73; -229.0 vs 229). The two zooms cannot be
+     stacked safely, so whenever the browser's own zoom is on we stand down completely: html.nativeZoom restores
+     touch-action:auto (see shell.css) so ANY input -- trackpad or fingers -- can pinch it back out natively; our wheel,
+     gesture and pinch paths no-op. When visualViewport.scale returns to 1 we take over again. If native zoom shows up
+     while our zoom is engaged, ours is dropped back to 1.0 first so there is only ever one. */
+  let nativeMode = false;
+  const nvv = window.visualViewport;
+  function setNative(on){
+    if(on === nativeMode) return;
+    nativeMode = on; window.PZ_NATIVE = on;
+    document.documentElement.classList.toggle('nativeZoom', on);
+    needsDebug = true; scheduleFrame();
+  }
+  function nativeCheck(){
+    if(!nvv) return;
+    const sc = nvv.scale, pinching = !!(window.PZ_PINCHING && window.PZ_PINCHING());
+    if(!nativeMode && sc > 1.03 && !pinching){
+      if(active){ nativeMode = false; zoomAt(K_MIN, innerWidth / 2, innerHeight / 2); }   /* drop OUR zoom first */
+      setNative(true);
+    } else if(nativeMode && sc < 1.012) setNative(false);
+  }
+  if(nvv){ nvv.addEventListener('resize', nativeCheck); nvv.addEventListener('scroll', nativeCheck); setInterval(nativeCheck, 250); }
+  window.PZ_NATIVE = false;
 
   /* click-drag empty space to pan */
   let pend = null;
@@ -3038,7 +3071,7 @@ if(window.visualViewport){
        would otherwise fight with the zoom this is about to apply. This is the pinch-specific
        counterpart to e.preventDefault() in pageZoom()'s own wheel/pend handlers above -- same
        principle (claim the gesture explicitly once we've decided to own it), different input. */
-    e.preventDefault();
+    if(!window.PZ_NATIVE) e.preventDefault();
     diagMoves++; diagD = d; diagWant = pinch.d > 0 ? pinch.k * (d / pinch.d) : 0;   /* TEMP DIAGNOSTIC */
     if(window.PZ_DBG) window.PZ_DBG();                                                /* TEMP DIAGNOSTIC: keep the readout live during a pinch */
     if(pinch.d > 0 && window.PZ_ZOOM_AT) window.PZ_ZOOM_AT(pinch.k * (d/pinch.d), (a.x+b.x)/2, (a.y+b.y)/2);
@@ -3121,6 +3154,7 @@ if(window.visualViewport){
     if(TP.cur) t += '\n' + tpLine(TP.cur, 'NOW ');
     for(let i = TP.done.length - 1; i >= 0; i--) t += '\n' + tpLine(TP.done[i], 'prev');
     { const g = window.PZ_GESTURE ? window.PZ_GESTURE() : null; if(g) t += `\nGESTURE EVENTS (Safari): start=${g.start} change=${g.change} end=${g.end} drove-zoom=${g.drove} ignored(touch owns)=${g.ignored} over-canvas=${g.over}\n   last gesture: first scale=${(+g.firstScale).toFixed(3)} now=${(+g.scale).toFixed(3)} min=${g.minScale === 99 ? '-' : (+g.minScale).toFixed(3)} max=${(+g.maxScale).toFixed(3)} -> k requested ${(+g.kReq).toFixed(2)}  event xy=${g.nativeXY} used xy=${g.xy}  ctrl-wheel ticks during gesture=${g.wheelDuring}`; }
+    t += `\nNATIVE-ZOOM MODE: ${window.PZ_NATIVE ? 'ON (browser zoom active; our zoom stands down)' : 'off'}`;
     t += `\nHANDOFF: ${handoff ? 'ARMED (touch events driving zoom)' : (HO.everArmed ? 'ended (' + (HO.ended || '-') + ')' : 'never armed')}`
       + `  armed after ${HO.ptrMoves} pointer moves, k at arm=${HO.kArm.toFixed(2)}, touch-driven zoom calls=${HO.moves}, k now=${(window.PZ ? window.PZ.k : 1).toFixed(2)}`;
     return t;
