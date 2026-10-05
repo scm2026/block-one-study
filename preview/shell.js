@@ -184,12 +184,59 @@ document.addEventListener('click', e=>{
   }
   const b = e.target.closest && e.target.closest('.sfnode'); if(!b) return;
   const box = b.closest('.srcfw'); const f = SRCFW[box.dataset.case]; if(!f) return;
+  const pop = document.getElementById('sfPop');
+  if(pop && !pop.hidden && sfPopNode === b){ sfPopHide(); return; }       /* same node again closes it */
   box.querySelectorAll('.sfnode[aria-pressed]').forEach(x=>x.removeAttribute('aria-pressed'));
   b.setAttribute('aria-pressed','true');
-  const det = box.querySelector('.sfdet');
-  det.innerHTML = sfDetailHTML(sfFind(sfRoot(f, box.dataset.mode), b.dataset.k), b.dataset.k);
-  try{ markTerms(det); }catch(err){}
+  sfPopShow(b, sfDetailHTML(sfFind(sfRoot(f, box.dataset.mode), b.dataset.k), b.dataset.k));
 });
+/* Clicking a node of the casebook framework opens its explanation in a small window, the same kind of card the
+   definitions use. It stays until closed (x or Esc), can be dragged by its title, and clicking another node switches it. */
+let sfPopNode = null;
+function makeDraggable(el, handleSel, okFn){
+  let st = null;
+  el.addEventListener('pointerdown', e=>{
+    if(e.button > 0 || (okFn && !okFn())) return;
+    if(e.target.closest('button, a, .term, .msym, input, select, textarea')) return;
+    if(!(e.target === el || e.target.closest(handleSel))) return;
+    const r = el.getBoundingClientRect();
+    st = {dx: e.clientX - r.left, dy: e.clientY - r.top, id: e.pointerId};
+    try{ el.setPointerCapture(e.pointerId); }catch(err){}
+    el.classList.add('dragging'); e.preventDefault();
+  });
+  el.addEventListener('pointermove', e=>{
+    if(!st || e.pointerId !== st.id) return;
+    const vv = window.visualViewport, L = vv ? vv.offsetLeft : 0, T = vv ? vv.offsetTop : 0, W = vv ? vv.width : innerWidth, H = vv ? vv.height : innerHeight;
+    const w = el.offsetWidth;
+    let x = e.clientX - st.dx, y = e.clientY - st.dy;
+    x = Math.max(L + 40 - w, Math.min(x, L + W - 40)); y = Math.max(T, Math.min(y, T + H - 34));
+    el.style.left = Math.round(x) + 'px'; el.style.top = Math.round(y) + 'px'; el.dataset.drag = '1';
+  });
+  const end = e=>{ if(!st || (e && e.pointerId !== st.id)) return; st = null; el.classList.remove('dragging'); };
+  el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+}
+function sfPopHide(){ const p = document.getElementById('sfPop'); if(p){ p.hidden = true; p.dataset.on = '0'; } sfPopNode = null; document.querySelectorAll('.sfnode[aria-pressed]').forEach(x=>x.removeAttribute('aria-pressed')); }
+function sfPopShow(anchor, html){
+  let p = document.getElementById('sfPop');
+  if(!p){
+    p = document.createElement('div'); p.id = 'sfPop'; p.className = 'fwtip pinned sfpop'; p.setAttribute('role','dialog'); p.hidden = true;
+    document.body.appendChild(p); makeDraggable(p, 'h5, .lab, .sfpill, .sfused');
+    document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && !p.hidden) sfPopHide(); });
+  }
+  p.innerHTML = html + '<button type="button" class="pin" aria-label="Close" style="display:flex">&times;</button>';
+  p.querySelector('.pin').addEventListener('click', e=>{ e.stopPropagation(); sfPopHide(); });
+  p.hidden = false; p.dataset.on = '1'; sfPopNode = anchor;
+  try{ markTerms(p); }catch(err){}
+  if(p.dataset.drag !== '1'){
+    const vv = window.visualViewport, L = vv ? vv.offsetLeft : 0, T = vv ? vv.offsetTop : 0, W = vv ? vv.width : innerWidth, H = vv ? vv.height : innerHeight;
+    const r = anchor.getBoundingClientRect(), w = Math.min(400, W - 20), pad = 10;
+    p.style.width = w + 'px'; p.style.maxWidth = w + 'px'; p.style.maxHeight = Math.max(160, H - 2*pad) + 'px';
+    const h = p.offsetHeight;
+    let x = r.right + 12; if(x + w > L + W - pad) x = Math.max(L + pad, r.left - w - 12);
+    let y = Math.max(T + pad, Math.min(r.top - 8, T + H - h - pad));
+    p.style.left = Math.round(x) + 'px'; p.style.top = Math.round(y) + 'px';
+  }
+}
 function drawSrcFw(c){
   const w = document.querySelector('#peekSrc .pbody'); if(!w) return;
   w.innerHTML = srcFwHTML(c.id, false);
@@ -219,7 +266,8 @@ function drawInd(c){
         const key = a + '.' + b; n++; if(known[key]) nk++;
         return `<div class="inditem${known[key]?' known':''}" data-i="${key}">
           <div class="indh">${esc(it.h)}</div>
-          <p><span class="ilab">In plain words</span>${esc(it.plain)}</p>
+          <p><span class="ilab">The idea</span>${esc(it.idea)}</p>
+          <p><span class="ilab">What the evidence shows</span>${esc(it.fact)}</p>
           <p><span class="ilab">In this case</span>${esc(it.here)}</p>
           ${it.sim?`<p><span class="ilab">Where the case simplifies</span>${esc(it.sim)}</p>`:''}
           ${it.ask?`<p class="indask"><span class="ilab">Ask this</span>&ldquo;${esc(it.ask)}&rdquo;</p>`:''}
@@ -428,6 +476,7 @@ function drawExhibit(key){
 }
 
 function render(){
+  try{ sfPopHide(); }catch(e){}
   const c = CASES[ci], s = c.steps[si];
   const v2 = V2[c.id] && V2[c.id][si];
   drawSparks(); drawToolkit(); drawConcept(); drawRail(); drawBridge(); drawTree(c, si);
@@ -943,6 +992,8 @@ function scrollToPanel(){
    grab it by any blank part (header, padding, the empty area around the tree) to move it, pull any edge or corner to resize it, press the cross to send it
    back to its slot. The page behind it stays put and keeps scrolling. Sizes are in vw/vh/clamp so browser zoom and window size rescale them.
    Under 1100px the peeks are ordinary cards and do not float. */
+/* Hover-to-enlarge on the right-hand windows is switched off for now (click opens a window). ?dockhover=1 turns it back on. */
+const DOCK_HOVER = /[?&]dockhover=1/.test(location.search);
 const PEEK_MIN_W = 240, PEEK_MIN_H = 150, PEEK_KEEP = 56;
 function buildDock(){
   if(document.getElementById('dock')) return;
@@ -1116,7 +1167,7 @@ function buildDock(){
     else dock.appendChild(w);
   };
   let t = null;
-  dock.addEventListener('mouseover', e=>{ if(window.NAV_ACTIVE) return; const w = e.target.closest('.peek'); if(!w) return; clearTimeout(t); t = setTimeout(()=>{ if(window.NAV_ACTIVE) return; dock.querySelectorAll('.peek.open').forEach(x=>{ if(x!==w) x.classList.remove('open'); }); w.classList.add('open'); }, 90); });
+  dock.addEventListener('mouseover', e=>{ if(window.NAV_ACTIVE || !DOCK_HOVER) return; const w = e.target.closest('.peek'); if(!w) return; clearTimeout(t); t = setTimeout(()=>{ if(window.NAV_ACTIVE) return; dock.querySelectorAll('.peek.open').forEach(x=>{ if(x!==w) x.classList.remove('open'); }); w.classList.add('open'); }, 90); });
   dock.addEventListener('mouseout', e=>{ const w = e.target.closest('.peek'); if(!w || w.contains(e.relatedTarget)) return; clearTimeout(t); w.classList.remove('open'); });
   dock.addEventListener('click', e=>{ const w = e.target.closest('.peek'); if(!w) return;
     if(e.target.closest('summary, a, button, .term, .fwnode')) return;          /* clicks on the content itself do their own thing */
@@ -1401,7 +1452,7 @@ function drawConcept(){
   const symMap = {};
   const collect = n => { if(/^[A-Za-zπ][A-Za-z0-9_*()]*$/.test(n.s)) symMap[n.s] = n.d; (n.k||[]).forEach(collect); };
   if(m) m.forms.forEach(f=>collect(f.tree));
-  if(m && m.watchMath) m.watchMath.forms.forEach(f=>collect(f.tree));
+  if(m && m.watchSteps && m.watchSteps.syms) Object.keys(m.watchSteps.syms).forEach(k=>{ symMap[k] = m.watchSteps.syms[k]; });
   const symNames = Object.keys(symMap).sort((a,b)=>b.length-a.length);
   const symRe = symNames.length ? new RegExp('(^|[^A-Za-z0-9_])(' + symNames.map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|') + ')(?![A-Za-z0-9_])','g') : null;
   const wrapSym = h => symRe ? h.replace(symRe, (all, pre, sy)=>`${pre}<span class="msym" tabindex="0" role="button" aria-label="${esc(sy)}: ${esc(symMap[sy])}">${sy}<span class="mtip"><b>${sy}</b> ${esc(symMap[sy])}</span></span>`) : h;
@@ -1418,9 +1469,12 @@ function drawConcept(){
       <div class="cformula cmath">${fmtF(f.f)}</div>
       <ul class="mtree">${ltree(f.tree)}</ul></div>`).join('')
     : (d.formula?`<span class="lab">The shape of it</span><div class="cformula">${esc(d.formula)}</div>`:'');
-  const watchMathHTML = w => `<div class="wmath"><span class="lab">The math behind it</span>` +
-    w.forms.map(f=>`<div class="cform">${f.label?`<span class="lab">${esc(f.label)}</span>`:''}<div class="cformula cmath">${fmtF(f.f)}</div><ul class="mtree">${ltree(f.tree)}</ul></div>`).join('') +
-    (w.work?`<span class="lab">Worked through, in the case</span>${bul(w.work)}`:'') + `</div>`;
+  const watchStepsHTML = w => `<div class="cwatchbox"><span class="lab">Watch out</span>
+    <p class="wmist"><b>The mistake:</b> ${esc(w.mistake)}</p>
+    <p class="wwhy"><b>Why it goes wrong:</b> ${esc(w.why)}</p>
+    <span class="lab">Check it step by step</span>
+    <ol class="wsteps">${w.steps.map(st=>`<li><p>${wrapSym(esc(st.say))}</p>${st.f?`<div class="cformula cmath">${fmtF(st.f)}</div>`:''}</li>`).join('')}</ol>
+    <p class="wrule"><b>The rule:</b> ${esc(w.rule)}</p></div>`;
   const trio = (d.here||d.big||d.without) ? `<div class="ctrio">
       ${d.here?`<div><span class="lab">Why it matters in this case</span><p>${esc(d.here)}</p></div>`:''}
       ${d.big?`<div><span class="lab">How it connects to the bigger picture</span><p>${esc(d.big)}</p></div>`:''}
@@ -1428,7 +1482,7 @@ function drawConcept(){
   const bullets = m ? `<div class="cbul">
       <div><span class="lab">Reading it</span>${bul(m.read)}</div>
       <div><span class="lab">Worked</span>${bul(m.work)}</div>
-      ${m.watch?`<div class="cwatchbox"><span class="lab">Watch out</span>${bul(m.watch)}${m.watchMath?watchMathHTML(m.watchMath):''}</div>`:''}</div>` : '';
+      ${m.watchSteps?watchStepsHTML(m.watchSteps):(m.watch?`<div class="cwatchbox"><span class="lab">Watch out</span>${bul(m.watch)}</div>`:'')}</div>` : '';
   el.innerHTML = `
     <div><h4>${esc(conceptOpen)}</h4>
       <span class="lab">In plain terms</span><p>${esc(d.plain)}</p>
@@ -2034,6 +2088,7 @@ function fwTip(){
     fwTipEl.className = 'fwtip'; fwTipEl.setAttribute('role','tooltip');
     fwTipEl.hidden = true;
     document.body.appendChild(fwTipEl);
+    makeDraggable(fwTipEl, 'h5, .lb', ()=>fwPinned);
   }
   return fwTipEl;
 }
@@ -2050,7 +2105,7 @@ function tipTouchTap(sameOpen, showFn){
   return true;
 }
 function fwTipHide(){
-  const t = fwTip(); t.dataset.on = "0"; t.hidden = true; fwTipAnchor = null;
+  const t = fwTip(); t.dataset.on = "0"; t.hidden = true; fwTipAnchor = null; t.dataset.drag = '0';
   /* hiding always unpins: a pinned card must never outlive the node it describes,
      which is what happens when the step re-renders underneath it */
   if(typeof fwPinned !== 'undefined' && fwPinned){ fwPinned = false; t.classList.remove('pinned'); }
@@ -2071,6 +2126,7 @@ let fwTipAnchor = null;
 function fwPlace(){
   const t = fwTipEl, el = fwTipAnchor;
   if(!t || !el) return;
+  if(t.dataset.drag === '1' && fwPinned) return;     /* the reader moved it: leave it where they put it */
   const vv = window.visualViewport;
   const vLeft = vv ? vv.offsetLeft : 0, vTop = vv ? vv.offsetTop : 0;
   const vW = vv ? vv.width : window.innerWidth, vH = vv ? vv.height : window.innerHeight;
@@ -2093,7 +2149,7 @@ function fwPlace(){
 function fwTipShow(el, html){
   const t = fwTip();
   fwTipAnchor = el;
-  t.innerHTML = html; t.hidden = false; t.dataset.on = "1";
+  t.innerHTML = html; t.hidden = false; t.dataset.on = "1"; if(!fwPinned) t.dataset.drag = '0';
   t.classList.toggle('tp', !!termTouch);   /* touch: a peek card is touchable, so tapping it pins it */
   fwPlace();
 }
@@ -2104,6 +2160,7 @@ function fwTipShow(el, html){
 function fwTipFollow(){
   if(!fwTipEl || fwTipEl.hidden || !fwTipAnchor) return;
   if(!fwTipAnchor.isConnected){ fwTipHide(); return; }
+  if(fwTipEl.dataset.drag === '1' && fwPinned) return;
   const vv = window.visualViewport;
   const vLeft = vv ? vv.offsetLeft : 0, vTop = vv ? vv.offsetTop : 0;
   const vW = vv ? vv.width : window.innerWidth, vH = vv ? vv.height : window.innerHeight;

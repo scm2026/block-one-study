@@ -968,3 +968,18 @@ html.fwdock #fwcard .fwwhen b, html.fwdock #fwcard .fwverdict b{font:600 9px "IB
 
 .cwatchbox .wmath{margin-top:10px; padding-top:8px; border-top:1px dashed color-mix(in srgb, var(--ink) 20%, transparent)}
 .cwatchbox .wmath .cform{margin:6px 0 8px}
+
+/* ---- popups: draggable, framework-node popup, watch-out walkthrough ---- */
+.fwtip.pinned h5, .fwtip.pinned .lb{cursor:grab; touch-action:none}
+.fwtip.dragging, .fwtip.dragging *{cursor:grabbing !important; user-select:none}
+.fwtip.sfpop{z-index:480; width:400px; max-width:calc(100vw - 20px); max-height:76vh; overflow-y:auto; opacity:1}
+.fwtip.sfpop[hidden]{display:none}
+.fwtip.sfpop .sfpill, .fwtip.sfpop .sfused{margin-right:6px}
+.fwtip.sfpop p{margin:0 0 6px; font-size:12.5px; line-height:1.5}
+.fwtip.sfpop .lab{display:block; font:600 9px "IBM Plex Mono",monospace; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); margin:7px 0 2px}
+.srcfw .sfdet{display:none}
+.cwatchbox .wmist, .cwatchbox .wwhy, .cwatchbox .wrule{margin:5px 0; font-size:13px; line-height:1.55}
+.cwatchbox .wsteps{margin:4px 0 6px; padding-left:22px}
+.cwatchbox .wsteps li{margin:0 0 9px}
+.cwatchbox .wsteps li p{margin:0 0 4px; font-size:13px; line-height:1.55}
+.cwatchbox .wsteps .cformula{margin:2px 0 0}
