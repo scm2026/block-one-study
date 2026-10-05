@@ -210,22 +210,27 @@ function drawInd(c){
   const pc = document.querySelector('#peekInd .pc');
   if(!D){ w.innerHTML = '<p class="indnone">No industry notes for this case yet.</p>'; if(pc) pc.textContent = 'none'; return; }
   const known = indKnown(c.id), step = si + 1;
-  const G = [['econ','How the sector makes money'],['twist','The twist in this sub-sector'],['ask','Sharper questions to ask'],['check','Reality check against the case']];
-  const n = D.items.length;
-  if(pc) pc.textContent = Object.keys(known).length + '/' + n + ' known';
-  w.innerHTML = `<p class="indsub">${esc(D.sub)}</p>` + G.map(([k,lab])=>{
-    const its = D.items.map((it,i)=>[it,i]).filter(x=>x[0].k===k); if(!its.length) return '';
-    return `<div class="indgrp"><div class="indlab">${lab}</div>` + its.map(([it,i])=>{
-      const lit = it.u.indexOf(step) >= 0;
-      return `<div class="inditem${lit?' lit':''}${known[i]?' known':''}" data-i="${i}">
-        <div class="indh">${esc(it.h)}${lit?'<span class="indnow">this step</span>':''}</div>
-        <p>${esc(it.t)}</p>
-        ${it.note?`<p class="indnote">${esc(it.note)}</p>`:''}
-        <div class="indfoot">${it.our?'<span class="indour">Our question / read, not a sourced fact</span>':
-          `<span class="indsrc">${it.url?`<a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.s)}</a>`:esc(it.s)}</span>`}
-          <button type="button" class="indtick" aria-pressed="${known[i]?'true':'false'}">${known[i]?'I know this ✓':'I know this'}</button></div></div>`;
-    }).join('') + '</div>';
+  let n = 0, nk = 0;
+  const srcLine = it => `<span class="indsrc">${it.url?`<a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.s)}</a>`:esc(it.s)}</span>`;
+  const html = D.sections.map((sec, a)=>{
+    const lit = sec.u.indexOf(step) >= 0;
+    return `<section class="indsec${lit?' lit':''}"><div class="indsh"><span>${esc(sec.h)}</span><i>${lit?'this step':'steps '+sec.u.join(' · ')}</i></div>
+      <p class="indintro">${esc(sec.intro)}</p>` + sec.items.map((it, b)=>{
+        const key = a + '.' + b; n++; if(known[key]) nk++;
+        return `<div class="inditem${known[key]?' known':''}" data-i="${key}">
+          <div class="indh">${esc(it.h)}</div>
+          <p><span class="ilab">In plain words</span>${esc(it.plain)}</p>
+          <p><span class="ilab">In this case</span>${esc(it.here)}</p>
+          ${it.sim?`<p><span class="ilab">Where the case simplifies</span>${esc(it.sim)}</p>`:''}
+          ${it.ask?`<p class="indask"><span class="ilab">Ask this</span>&ldquo;${esc(it.ask)}&rdquo;</p>`:''}
+          ${it.defs&&it.defs.length?`<dl class="inddefs"><dt class="ilab">Words in this note</dt>${it.defs.map(([t,m])=>`<dd><b>${esc(t)}</b>: ${esc(m)}</dd>`).join('')}</dl>`:''}
+          ${it.note?`<p class="indnote">${esc(it.note)}</p>`:''}
+          <div class="indfoot">${srcLine(it)}<button type="button" class="indtick" aria-pressed="${known[key]?'true':'false'}">${known[key]?'I know this ✓':'I know this'}</button></div></div>`;
+      }).join('') + '</section>';
   }).join('');
+  if(pc) pc.textContent = nk + '/' + n + ' known';
+  w.innerHTML = `<p class="indsub">${esc(D.sub)}</p>` + html;
+  try{ markTerms(w); }catch(err){}
 }
 document.addEventListener('click', e=>{
   const b = e.target.closest && e.target.closest('.indtick'); if(!b) return;
@@ -2108,7 +2113,7 @@ function termFirst(p){ const m = String(p).match(/^.*?[.!?](?=\s|$)/); const t =
 var _tipKey = '';   /* the exact key the reader hovered: tells an inflected form from the entry itself */
 function indTipHTML(g){
   const c = termCase(); const n = g && g.ind && c && g.ind[c]; if(!n) return '';
-  return `<div class="here ind"><span class="lb">Industry lens</span><p>${esc(n.t)}</p><p class="indsrc">${esc(n.s)}</p></div>`;
+  return `<div class="here ind"><span class="lb">Industry lens</span><p>${esc(n.t)}</p>${n.a?`<p class="indhere"><b>Applied here:</b> ${esc(n.a)}</p>`:''}<p class="indsrc">${esc(n.s)}</p></div>`;
 }
 function fwTipHTML(title, g, here, flag, ctx, rel){
   if(!g && !ctx) return '';   /* never show an empty card */

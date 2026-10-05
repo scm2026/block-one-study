@@ -1472,22 +1472,81 @@ const V2B = {
 };
 const V2 = Object.assign({}, V2A, V2B);
 
-/* Industry lens: sourced sector notes per case. k: econ | twist | ask | check. u = steps (1-based) where it lights up.
-   Every factual item names publisher + date; our own reads are flagged our:true and are never presented as sourced. */
+/* Industry lens, per case: sections in the order the case unfolds. Each section lights up on the steps in u (1-based).
+   Item fields: h headline, plain (simple explanation), here (how it lands in this case), sim (where the case simplifies),
+   ask (a sharper question to ask), defs [[term, plain meaning]], s source+date, url, note (caveat / our own read).
+   Anything that is our own read, not a published figure, says so in note and is never presented as sourced. */
 const INDUSTRY = {
- "BTH-01": { title:"Hotels on a military base", sub:"How this sector actually works, and where the case simplifies it. Sourced, dated, and labelled where it is our own read.",
-  items:[
-   {k:"econ", u:[3], h:"Lodging and meals are separate allowances", t:"Official travel reimburses the room and meals as two allowances. For FY2026 the standard rates are $110 for lodging and $68 for meals and incidentals. The case folds both into one $75, so the room-only ceiling is the number that matters.", s:"GSA, FTR Bulletin 26-01, FY2026"},
-   {k:"econ", u:[6], h:"Rooms are not the only revenue line", t:"In a 2016 industry sample, food and beverage was about 29% of hotel revenue. The sample leans toward full-service hotels, so a limited-service base hotel would likely earn a smaller share.", s:"CBRE Hotels Research, 2016", note:"The second sentence is our read, not a published figure."},
-   {k:"econ", u:[2,7], h:"Operators prefer to own less", t:"The five largest chains held about a third fewer assets per revenue dollar than in 2002, and the share of a hotel company's franchised hotels correlates 0.84 with its net margin. A buyer who owns the building is going against that grain.", s:"BCG, Sept 2014; McKinsey, May 2024", url:"https://www.bcg.com/publications/2014/business-model-innovation-growth-asset-light-is-right"},
-   {k:"twist", u:[1,4], h:"No promised occupancy", t:"For Army-base hotels, the Army stated it gave private investors no guarantee on the loan or on occupancy. The soldiers are expected demand, not contracted demand.", s:"U.S. Army, 2011"},
-   {k:"twist", u:[6,7], h:"The land is leased, and the deal is slow", t:"Enhanced use leases are the most common Army land deal. They take a long time and need legal, financial and real-estate specialists, so up-front cost includes time and deal complexity.", s:"RAND, RR2696, Sept 2019", url:"https://www.rand.org/pubs/research_reports/RR2696.html"},
-   {k:"twist", u:[7], h:"A 4-5 year hurdle sits against expensive debt", t:"In a 2023 survey, 89% of hoteliers called loan rates above 8% unacceptable, and the analysis warned of negative leverage, where debt lowers the equity return.", s:"BCG, June 2023", url:"https://www.bcg.com/publications/2023/unexpected-opportunities-from-rising-hotel-loan-interest-rates"},
-   {k:"twist", u:[7,8], h:"The exit market has recovered", t:"Direct hotel investment is up 22% from the 2023 trough, with record capital available. That supports assuming a buyer exists; it says nothing about a one-customer hotel on leased land, which is a narrower pool.", s:"JLL, Feb 2026", url:"https://www.jll.com/en-us/newsroom/2026-global-hotel-investment-outlook-report", note:"The narrower-pool point is our read."},
-   {k:"ask", u:[1,4], h:"Is the occupancy committed or only expected?", t:"The question that separates a contract from a forecast, and it changes the risk on the whole answer.", our:true},
-   {k:"ask", u:[3], h:"Is the $75 the room alone or the room plus meals?", t:"The case answers this for you. In a real interview the answer moves the price ceiling by a third or more.", our:true},
-   {k:"ask", u:[6,7], h:"Who owns the land, and for how long?", t:"Payback against a hurdle only means something if the investor controls the site for longer than the payback.", our:true},
-   {k:"check", u:[3], h:"One number instead of two", t:"The case's single $75 stands in for two separate allowances that change every October 1. Say so before relying on it.", our:true},
-   {k:"check", u:[6], h:"One build cost for the whole hotel", t:"The $20M build is a single figure. Real build cost varies by service level and by year; name it as an assumption you would verify.", our:true}
+ "BTH-01": { title:"Hotels on a military base",
+  sub:"Read top to bottom: it follows the case, from who pays, to whether rooms fill, to whether the money comes back. Every fact names its source and date; anything that is our own read says so.",
+  sections:[
+   {h:"1. Who is paying, and what is the price?", u:[1,3], intro:"The case starts by asking what the hotel can charge. In the real world that depends on who is paying.", items:[
+    {h:"A room and a meal are paid for separately", 
+     plain:"When someone travels on government business, the government gives a fixed daily allowance, called a per diem. It has two parts: one for the room and one for meals and small extras. For 2026 the standard US amounts are $110 for the room and $68 for meals and extras.",
+     here:"The case rolls both into one $75 a night, then takes meals out to reach a $60 room price. That is a sensible shortcut, but the true room-only ceiling depends on the base and the year.",
+     ask:"Is the $75 the room alone, or the room plus meals?",
+     defs:[["per diem","a fixed daily allowance for travel costs"],["meals and incidentals (M&IE)","food plus small extras such as tips"],["GSA","the US government agency that publishes the standard rates"],["FY2026","the government's 2026 budget year, October 2025 to September 2026"]],
+     s:"GSA, FTR Bulletin 26-01, FY2026", note:"Rates reset every October 1, so the FY2027 rates now apply; we have not looked those up."},
+    {h:"Here the buyer sets the price, not the market",
+     plain:"Across all US hotels in 2025 the average room cost about $160.54 a night, up only 0.9% on the year. Most hotels can nudge price up or down to fill rooms. A hotel whose main customer pays a capped rate cannot.",
+     here:"The case's $60 sits far below that average because the Army caps it. Price is a ceiling someone else sets, so the levers left are filling rooms, adding other income and cutting cost.",
+     defs:[["average daily rate (ADR)","room revenue divided by the number of rooms sold"],["ceiling","the most the buyer will pay"]],
+     s:"CoStar (STR), Jan 20 2026", note:"The national figure covers all hotel types, so it is a rough yardstick, not a like-for-like comparison (our read)."}
+   ]},
+   {h:"2. Will the rooms actually fill?", u:[1,4,5], intro:"Revenue is rooms sold times price. Price is fixed, so the number of rooms sold carries the case.", items:[
+    {h:"Demand on a base is expected, not promised",
+     plain:"Occupancy is the share of rooms that are sold. In 2025 the US average was 62.3%, down 1.2% on 2024. For Army-base hotels, the Army stated it gave private investors no guarantee on either the loan or occupancy.",
+     here:"The case sells 120,000 of 146,000 possible room-nights (400 rooms times 365), about 82%. That is far above the national average, and all of it rests on soldier numbers the Army does not promise.",
+     ask:"Is the occupancy committed under a contract, or only expected?",
+     defs:[["occupancy","the share of available rooms that are sold"],["room-night","one room occupied for one night"],["underwrite","judge the risk of a deal before committing money to it"],["guarantee","a promise that the investor is covered if demand falls short"]],
+     s:"U.S. Army, 2011; CoStar (STR), Jan 2026"},
+    {h:"When you are full, price is the usual release valve; here it isn't",
+     plain:"A hotel has a fixed number of rooms. When demand outruns them, standard practice is to raise rates and favour higher-paying guests. That is called revenue management.",
+     here:"At the peak the Army needs about 80 more rooms than the hotel has, but the rate is capped, so that demand is simply lost. The fix has to come from more rooms or other income, not from price.",
+     defs:[["capacity","the number of rooms available to sell"],["revenue management","adjusting price to demand to earn the most from a fixed number of rooms"],["shortfall","demand you cannot serve"]],
+     s:"University of West Florida, revenue-management course text (undated)", note:"A teaching text rather than market data; use it for the idea, not a figure."}
+   ]},
+   {h:"3. What else can the hotel earn?", u:[2,7], intro:"If price is capped, the next question is whether the hotel earns anything besides rooms.", items:[
+    {h:"Rooms are not the only income",
+     plain:"Hotels also sell food, drink, meeting space and other services. All of that is non-occupancy revenue. In a 2016 industry sample, food and beverage alone was about 29% of hotel revenue.",
+     here:"The casebook lists it but never gives a number. With price capped, it is the one lever that could shorten payback.",
+     ask:"Is there a restaurant, or would the base already supply meals?",
+     defs:[["non-occupancy revenue","income that is not the room rate: food, drink, meeting space"],["food and beverage (F&B)","restaurants, bars and catering"],["full-service hotel","a hotel with restaurants, bars and meeting rooms"],["limited-service hotel","mostly rooms, with little else to buy"]],
+     s:"CBRE Hotels Research, 2016", note:"The sample leans toward full-service hotels, so a limited-service base hotel would probably earn a smaller share. That part is our read."}
+   ]},
+   {h:"4. What does it cost to run?", u:[6], intro:"The case gives one annual cost. Here is what is usually inside a number like that.", items:[
+    {h:"Staff are the biggest cost, and hard to flex",
+     plain:"In 2013, labor was about 45% of all the dollars spent running US hotels and about 32% of revenue. Salaries per room stayed nearly flat (about $13,150) from 2007 to 2013 while revenue grew, and benefits and payroll taxes kept rising.",
+     here:"The case treats the $4.0M as one lump. Asking how much of it is staff tells you how much can realistically be cut.",
+     sim:"One lump hides the split between costs that rise with each guest and costs that do not.",
+     ask:"How much of the $4.0M is staff, and does it change with occupancy?",
+     defs:[["labor cost","wages plus benefits for hotel staff"],["fixed cost","does not change with how many rooms are sold"],["variable cost","rises with each room sold, such as cleaning, laundry and supplies"],["payroll costs","benefits, taxes and paid leave on top of wages"],["per available room","divided by all rooms, sold or not"]],
+     s:"LODGING Magazine, Oct 2014 (2013 data)", note:"Dated figures. Our read: because staff cost barely falls with fewer guests, a weak year cuts profit faster than revenue."}
+   ]},
+   {h:"5. Who should own the building, and on whose land?", u:[2,6,7], intro:"The client is a private-equity firm building and owning a hotel on land it does not own.", items:[
+    {h:"Big hotel companies prefer not to own buildings",
+     plain:"The five largest chains hold about a third less property per dollar of revenue than in 2002. They earn fees by branding or running hotels that others own. McKinsey found a 0.84 correlation between a hotel company's franchised share and its net profit margin.",
+     here:"A private-equity firm that builds and owns the hotel does the opposite. That suits a financial buyer, but it carries the building risk the chains avoid.",
+     defs:[["asset-light","earning fees from hotels you do not own"],["franchise","letting an owner use your brand for a fee"],["management contract","running someone else's hotel for a fee"],["correlation","how closely two numbers move together; 1 means in lockstep"],["net margin","profit as a share of revenue"]],
+     s:"BCG, Sept 2014; McKinsey, May 2024", url:"https://www.bcg.com/publications/2014/business-model-innovation-growth-asset-light-is-right"},
+    {h:"The land is leased, and the lease deal is slow",
+     plain:"The Army usually leases land to private partners instead of selling it. The most common type is an enhanced use lease. RAND found these deals take a long time and need legal, financial and real-estate specialists.",
+     here:"'Free land' in the case is not free of cost. Time, advisers and the length of the lease all affect when the money comes back.",
+     ask:"Who owns the land, and for how long?",
+     defs:[["enhanced use lease","lets the military lease its land to a private builder in return for money or services"],["ground lease","you lease the land and own only what you build on it"],["outgrant","the military's word for letting an outside party use its property"]],
+     s:"RAND, RR2696, Sept 2019", url:"https://www.rand.org/pubs/research_reports/RR2696.html"}
+   ]},
+   {h:"6. Can the money come back in time?", u:[7,8], intro:"The client wants its money back in 4 to 5 years. The case says 6.25.", items:[
+    {h:"Borrowing costs squeeze hotel returns",
+     plain:"In 2023, hotel loans cost roughly 8 to 9%, and 89% of hoteliers called rates above 8% unacceptable. When debt costs more than the property earns, borrowing lowers your return rather than raising it. That is called negative leverage.",
+     here:"High debt cost makes a slow payback harder to defend. A 6.25-year payback against a 4 to 5 year hurdle looks worse when money is expensive.",
+     defs:[["cost of debt","the interest you pay to borrow"],["negative leverage","when borrowing lowers your return instead of raising it"],["payback","years until the investment earns its money back"],["hurdle","the minimum return or speed the investor demands"]],
+     s:"BCG, June 2023", url:"https://www.bcg.com/publications/2023/unexpected-opportunities-from-rising-hotel-loan-interest-rates", note:"2023 survey; rates have moved since."},
+    {h:"A buyer is probably there when you want to sell",
+     plain:"Direct hotel investment is up 22% from its 2023 low, with record capital waiting to be invested.",
+     here:"That supports the case's idea of selling at the end. A hotel with one customer on leased land will still have fewer buyers than an ordinary hotel (our read).",
+     defs:[["exit","selling an investment to get your money out"],["trough","the lowest point before a recovery"],["sale value","what the hotel would sell for at the end"]],
+     s:"JLL, Feb 2026", url:"https://www.jll.com/en-us/newsroom/2026-global-hotel-investment-outlook-report"}
+   ]}
   ]}
 };
