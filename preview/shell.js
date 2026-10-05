@@ -102,27 +102,79 @@ const isGated = (cid, i, q) => revealMode === 'practice' && !revealed.has(rkey(c
 
 /* The casebook's own framework (SRCFW, per case): one structured outline, used both in the side window
    and inline on the Framework step. */
-function srcFwCount(nodes){ let u=0,n=0; (function w(a){ a.forEach(x=>{ if(x.st==='u'||x.st==='l')u++; else if(x.st==='n')n++; w(x.k); }); })(nodes); return {u,n}; }
+const SF_FROM = {given:'Handed to you in the prompt', ask:'The interviewer gives it only if you ask', calc:'You work it out from other numbers', none:'The case never supplies it'};
+function sfNode(c){ return c; }
+function sfFind(root, key){ let n = root; key.split('.').slice(1).forEach(i=>{ n = n.k[+i]; }); return n; }
+function sfWalk(n, key, fn){ fn(n, key); (n.k||[]).forEach((x,i)=>sfWalk(x, key + '.' + i, fn)); }
+function sfRoot(f){ return Object.assign({}, f.hyp, {k: f.kids}); }
+/* the casebook's own framework as a left-to-right tree. step = the 1-based step that lights it up
+   (0 = light everything: the Framework step itself, where the whole structure is being built) */
 function srcFwHTML(id, inline){
   const f = (typeof SRCFW !== 'undefined') && SRCFW[id];
   if(!f) return `<p class="sfnone">This case has no casebook framework added here yet. The pilot covers Army Hotel and Breast Cancer Surgery.</p>`;
-  const lab = {u:'used',n:'never used',l:'used as one lump'};
-  const node = x => `<li class="sfn ${x.st?'st-'+x.st:'grp'}"><span class="sft">${esc(x.t)}</span>${x.st?`<span class="sfb">${lab[x.st]}</span>`:''}${x.n?`<span class="sfnote">${esc(x.n)}</span>`:''}${x.k.length?`<ul>${x.k.map(node).join('')}</ul>`:''}</li>`;
-  const cnt = srcFwCount(f.branches);
-  return `<div class="srcfw${inline?' inl':''}">
+  const root = sfRoot(f), stepNo = (inline || si + 1 === f.buildStep) ? 0 : si + 1;
+  const lit = [];
+  sfWalk(root, 'h', (n,k)=>{ if(stepNo && (n.u||[]).includes(stepNo) && k !== 'h') lit.push(n.t); });
+  const cls = n => {
+    if(!stepNo) return n.from === 'none' && !(n.u||[]).length ? 'never' : '';
+    if((n.u||[]).includes(stepNo)) return 'lit';
+    if(n.from === 'none' && !(n.u||[]).length) return 'never';
+    if((n.u||[]).length) return 'seen';
+    return '';
+  };
+  const hasLitKid = n => (n.k||[]).some(x=>(x.u||[]).includes(stepNo) || hasLitKid(x));
+  const node = (n, key) => {
+    const kids = n.k || [];
+    const c0 = cls(n) + (stepNo && !((n.u||[]).includes(stepNo)) && hasLitKid(n) ? ' path' : '');
+    return `<li${kids.length?' class="hk"':''}><button type="button" class="sfnode ${c0}${key==='h'?' root':''}" data-k="${key}">` +
+      `<span class="sfname">${esc(n.t)}</span>${n.from?`<i class="sfsrc sf-${n.from}" title="${esc(SF_FROM[n.from])}"></i>`:''}</button>` +
+      (kids.length ? `<ul>${kids.map((x,i)=>node(x, key + '.' + i)).join('')}</ul>` : '') + `</li>`;
+  };
+  const first = stepNo ? (()=>{ let r = null; sfWalk(root,'h',(n,k)=>{ if(!r && k!=='h' && (n.u||[]).includes(stepNo)) r = k; }); return r || 'h'; })() : 'h';
+  const html = `<div class="srcfw${inline?' inl':''}" data-case="${esc(id)}">
     <p class="sfmeta">${esc(f.src)}</p>
-    ${f.hyp?`<div class="sfhyp"><span class="lab">Working hypothesis — said first</span><b>${esc(f.hyp)}</b><span class="sflead">${esc(f.lead)}</span></div>`
-            :`<div class="sfhyp"><span class="lab">What the book asks for</span><span class="sflead">${esc(f.lead)}</span></div>`}
-    <div class="sfcols">${f.branches.map(b=>`<div class="sfbr"><div class="sfh"><b>${esc(b.t)}</b>${b.n?`<span>${esc(b.n)}</span>`:''}</div><ul>${b.k.map(node).join('')}</ul></div>`).join('')}</div>
-    <p class="sfhow">${esc(f.how)}</p>
-    <p class="sfcount"><b>${cnt.u}</b> of its ${cnt.u+cnt.n} branches get used in this case; <b>${cnt.n}</b> are listed and never touched.</p>
+    <div class="sfscroll"><ul class="sftree">${node(root,'h')}</ul></div>
+    <div class="sfkey"><span><i class="sfsrc sf-given"></i>in the prompt</span><span><i class="sfsrc sf-ask"></i>only if you ask</span><span><i class="sfsrc sf-calc"></i>you work it out</span><span><i class="sfsrc sf-none"></i>never supplied</span>${stepNo?'<span><b class="sfl lit">lit</b>used on this step</span><span><b class="sfl seen">seen</b>used on another step</span>':''}</div>
+    ${stepNo?`<p class="sflitline">${lit.length?'Lit on this step: <b>'+lit.map(esc).join('</b>, <b>')+'</b>.':'Nothing from the casebook framework is used on this step.'}</p>`:''}
+    <div class="sfdet">${sfDetailHTML(sfFind(root, first), first)}</div>
   </div>`;
+  return html.replace(`data-k="${first}"`, `data-k="${first}" aria-pressed="true"`);
 }
+function sfDetailHTML(n, key){
+  const used = (n.u||[]).length ? 'Used on step ' + n.u.join(', ') : (n.from === 'none' ? 'Not used in this case' : '');
+  return `<h5>${esc(n.t)}</h5>
+    ${n.from?`<span class="sfpill sf-${n.from}">${esc(SF_FROM[n.from])}</span>`:''}${used?`<span class="sfused">${esc(used)}</span>`:''}
+    ${n.def?`<div><span class="lab">What it means</span><p>${esc(n.def)}</p></div>`:''}
+    ${n.why?`<div><span class="lab">Why you need it</span><p>${esc(n.why)}</p></div>`:''}
+    ${n.n?`<div><span class="lab">In this case</span><p>${esc(n.n)}</p></div>`:''}`;
+}
+function sfFit(box){
+  const sc = box.querySelector('.sfscroll'); if(!sc) return;
+  const t = sc.querySelector('.sftree'); t.style.zoom = 1;
+  const need = t.scrollWidth, have = sc.clientWidth;
+  if(have > 40 && need > have) t.style.zoom = Math.max(.55, have / need);
+}
+document.addEventListener('click', e=>{
+  const b = e.target.closest && e.target.closest('.sfnode'); if(!b) return;
+  const box = b.closest('.srcfw'); const f = SRCFW[box.dataset.case]; if(!f) return;
+  box.querySelectorAll('.sfnode[aria-pressed]').forEach(x=>x.removeAttribute('aria-pressed'));
+  b.setAttribute('aria-pressed','true');
+  const det = box.querySelector('.sfdet');
+  det.innerHTML = sfDetailHTML(sfFind(sfRoot(f), b.dataset.k), b.dataset.k);
+  if(typeof markTerms === 'function') markTerms(det);
+});
 function drawSrcFw(c){
   const w = document.querySelector('#peekSrc .pbody'); if(!w) return;
   w.innerHTML = srcFwHTML(c.id, false);
   const pc = document.querySelector('#peekSrc .pc');
-  if(pc) pc.textContent = (typeof SRCFW !== 'undefined' && SRCFW[c.id]) ? 'book' : 'none';
+  const has = typeof SRCFW !== 'undefined' && SRCFW[c.id];
+  if(pc) pc.textContent = has ? 'book' : 'none';
+  if(has){
+    try{ markTerms(w.querySelector('.sfdet')); }catch(err){}
+    const box = w.querySelector('.srcfw');
+    sfFit(box);
+    if(window.ResizeObserver){ if(drawSrcFw._ro) drawSrcFw._ro.disconnect(); drawSrcFw._ro = new ResizeObserver(()=>sfFit(box)); drawSrcFw._ro.observe(w); }
+  }
 }
 function renderV2(c, s, v){
   const bk = c.book === 'kellogg';
@@ -326,7 +378,7 @@ function render(){
       <button id="next" ${si===c.steps.length-1&&ci===CASES.length-1?'disabled':''}>${
         si<c.steps.length-1?esc(c.steps[si+1].tab):'Next case'} →</button>
     </div>`;
-  markAllTerms(); updateSticky(); dockCounts();
+  markAllTerms(); drawSrcFw(c); updateSticky(); dockCounts(); document.querySelectorAll('#body .srcfw').forEach(sfFit);
   el('prev').onclick = ()=>{ if(si>0){si--;} else if(ci>0){ci--; si=CASES[ci].steps.length-1;} render(); scrollToPanel(); };
   el('next').onclick = ()=>{ if(si<c.steps.length-1){si++;} else if(ci<CASES.length-1){ci++; si=0;} render(); scrollToPanel(); };
 }
@@ -1231,25 +1283,34 @@ function drawConcept(){
   const el = document.createElement('div');
   el.className = 'cpanel';
   const m = d.math;
-  const mathHTML = m ? `<span class="lab">The math</span>
-      <div class="cformula cmath">${esc(m.f)}</div>
-      <dl class="csym">${m.sym.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
-      <p><b>Reading it.</b> ${esc(m.read)}</p>
-      <p class="cwork"><b>Worked.</b> ${esc(m.work)}</p>`
+  const fmt = t => esc(t).replace(/\{([^|{}]+)\|([^{}]+)\}/g, '<span class="frac"><span>$1</span><span>$2</span></span>');
+  const ltree = n => `<li${(n.k&&n.k.length)?' class="hk"':''}><div class="mnode"><b>${fmt(n.s)}</b><span>${fmt(n.d||'')}</span>${n.op?`<em>${esc(n.op)}</em>`:''}</div>${(n.k&&n.k.length)?`<ul>${n.k.map(ltree).join('')}</ul>`:''}</li>`;
+  const bl = a => { let out = '<ul>'; a.forEach(x=>{ if(Array.isArray(x)) out += bl(x).replace(/^<ul>/, '<ul class="sub">'); else out += `<li>${fmt(x)}`+'</li>'; }); return out + '</ul>'; };
+  /* data nests a child list right after its parent line; flatten that into parent > children */
+  const nest = a => { const out = []; a.forEach(x=>{ if(Array.isArray(x) && out.length && !Array.isArray(out[out.length-1])) { const last = out.pop(); out.push([last, nest(x)]); } else out.push(Array.isArray(x)&&x.length===2&&typeof x[0]==='string'&&Array.isArray(x[1]) ? [x[0], nest(x[1])] : x); }); return out; };
+  const li = x => Array.isArray(x) ? `<li>${fmt(x[0])}<ul>${x[1].map(li).join('')}</ul></li>` : `<li>${fmt(x)}</li>`;
+  const bul = a => `<ul class="bl">${nest(a).map(li).join('')}</ul>`;
+  const mathHTML = m ? m.forms.map(f=>`<div class="cform">${f.label?`<span class="lab">The math: ${esc(f.label)}</span>`:'<span class="lab">The math</span>'}
+      <div class="cformula cmath">${fmt(f.f)}</div>
+      <ul class="mtree">${ltree(f.tree)}</ul></div>`).join('')
     : (d.formula?`<span class="lab">The shape of it</span><div class="cformula">${esc(d.formula)}</div>`:'');
   const trio = (d.here||d.big||d.without) ? `<div class="ctrio">
       ${d.here?`<div><span class="lab">Why it matters in this case</span><p>${esc(d.here)}</p></div>`:''}
       ${d.big?`<div><span class="lab">How it connects to the bigger picture</span><p>${esc(d.big)}</p></div>`:''}
       ${d.without?`<div><span class="lab">Without it</span><p>${esc(d.without)}</p></div>`:''}</div>` : '';
+  const bullets = m ? `<div class="cbul">
+      <div><span class="lab">Reading it</span>${bul(m.read)}</div>
+      <div><span class="lab">Worked</span>${bul(m.work)}</div>
+      ${m.watch?`<div class="cwatchbox"><span class="lab">Watch out</span>${bul(m.watch)}</div>`:''}</div>` : '';
   el.innerHTML = `
     <div><h4>${esc(conceptOpen)}</h4>
       <span class="lab">In plain terms</span><p>${esc(d.plain)}</p>
       ${d.eg?`<span class="lab">Examples</span><p>${esc(d.eg)}</p>`:''}
       <span class="lab">${d.here?'Why it matters in a case, generally':'Why it matters in a case'}</span><p>${esc(d.why)}</p></div>
-    <div>${mathHTML}
-      ${d.watch?`<span class="lab">Watch out</span><p class="cwatch">${esc(d.watch)}</p>`:''}
+    <div>${m?'':mathHTML}
+      ${(!m && d.watch)?`<span class="lab">Watch out</span><p class="cwatch">${esc(d.watch)}</p>`:''}
       <p class="cmet" style="margin-top:10px">First met in <b>${esc(d.met)}</b>.</p></div>
-    ${trio}`;
+    ${m?`<div class="cmathrow">${mathHTML}</div>`:''}${bullets}${trio}`;
   box.appendChild(el);
 }
 document.getElementById('toolkit').addEventListener('click', e=>{

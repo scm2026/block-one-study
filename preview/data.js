@@ -571,66 +571,94 @@ const FWB = {"profit":{"id":"root","t":"Profit","s":"revenue − cost","op":"−
 const FW = {"BTH-01":[{"base":"profit","name":"Profit tree","fit":"full","when":"The default whenever the question is whether something makes money.","over":{"root":{"st":"same","s":"$3.2M a year"},"rev":{"st":"same","s":"$7.2M / yr"},"price":{"st":"changed","s":"$60 — capped"},"vol":{"st":"changed","s":"120,000 after capacity"},"cost":{"st":"changed","s":"$4M / yr + $20M once"},"fx":{"st":"changed","s":"$20M build, one-off"},"vc":{"st":"same","s":"$4M running"}},"add":[{"parent":"root","id":"payb","t":"Payback","s":"$20M ÷ $3.2M","nb":1}],"ann":[["Revenue","Room-nights × rate. Both halves are capped by something outside the market: the rate by the payer at $60, the volume by an 80-room shortage across four months. 129,000 room-nights becomes 120,000."],["Cost","One annual figure, plus a one-off build that sits outside the year. The build is what forces the extra branch."],["Profit","$3.2M a year — which is where most candidates stop, and it isn't the answer."],["Payback","Not part of the canned shape at all. You have to graft it on."]],"note":"The trunk works unchanged. What this case adds is that profit alone doesn't decide it."},{"base":"entry","name":"Market entry","fit":"partial","when":"When a client is deciding whether to go into a new market or location.","over":{"mkt":{"st":"changed","s":"one base, countable"},"comp":{"st":"same","s":"3 hotels, 1 real rival"},"econ":{"st":"changed","s":"the only branch working"},"cap":{"st":"dropped","s":"never questioned"}},"add":[],"ann":[["Market","Fixed and countable — soldiers passing through one base, not a market to size."],["Competition","Three hotels, and only one of them is really a rival."],["Capability","Assumed — the case never questions whether a PE firm can run a hotel."],["Economics","This is the only branch that does any work."]],"note":"Market entry gets you to 'should we do this' and stops. It has nothing to say about how fast the money comes back, which is the actual test — so it has to be combined with the investment lens."},{"base":"invest","name":"Investment decision","fit":"full","when":"When the client is a financial buyer, or the question is what to pay.","over":{"cin":{"st":"same","s":"$3.2M a year"},"cout":{"st":"same","s":"$20M, all at the start"},"time":{"st":"dropped","s":"no discounting here"},"hurdle":{"st":"same","s":"4–5 yrs, on request"},"exit":{"st":"dropped","s":"never discussed"}},"add":[],"ann":[["Cash in","$3.2M a year for as long as the base runs."],["Cash out","$20M, all at the start."],["Hurdle","4–5 years, and you only get it by asking."],["Time","No discount rate is given, so payback in plain years is the whole test. Case 8 switches this branch on."],["Exit","Never discussed by the case at all."]],"note":"Combine this with the profit tree and the case is solved. Either one alone gives a confident wrong answer."}],"BTH-19":[{"base":"attrition","name":"Attrition / retention","fit":"full","when":"When people are leaving and you need to know why.","over":{"who":{"st":"changed","s":"juniors under a year"},"push":{"st":"changed","s":"narrowed to pay"},"pull":{"st":"dropped","s":"raised, never checked"},"costl":{"st":"same","s":"6 months of ramp in 12"}},"add":[],"ann":[["Who leaves","Juniors under a year; seniors past three almost never — this contrast is the case."],["Push factors","Narrowed to pay, because everything else is shared with the seniors who stay."],["Pull factors","Raised in the risks and never investigated."],["Cost of leaving","Six months of ramp inside a twelve-month tenure."]],"note":"The framework's job here is elimination. Anything that applies to both groups can be struck out on the first pass."},{"base":"twogroup","name":"Two-group comparison","fit":"full","when":"Any time one group behaves differently from a similar group — the cheapest diagnostic there is.","over":{"hold":{"st":"same","s":"firm · product · offices"},"vary":{"st":"same","s":"what · where · paid how"},"test":{"st":"dropped","s":"no figures supplied"}},"add":[],"ann":[["Hold constant","The firm, the product, the industry, the offices."],["Vary","What they sell · where they sell it · what they're paid for it."],["Test","None of it — the case never supplies a single figure to test against. The framework gets you to the right question and then runs out of data."]],"note":"This is not a named consulting framework, and it is the one that actually solves the case."},{"base":"comp","name":"Compensation design","fit":"partial","when":"When the suspected cause is how people are paid.","over":{"cmix":{"st":"same","s":"salary + commission"},"basis":{"st":"same","s":"volume · type · distance"},"align":{"st":"changed","s":"the iPod/iMac point"},"fair":{"st":"dropped","s":"raised, never measured"}},"add":[],"ann":[["Mix","Small salary plus commission — stated, never quantified."],["Basis","Volume, product type, distance travelled."],["Alignment","A high-effort product at the same commission rate pays worse per hour. This is the branch that carries the answer."],["Fairness","Territory and travel differences, raised and never measured."]],"note":"Useful as the second layer — but reaching for it first is how you end up asserting the answer, which is exactly what the casebook's own framework does."}],"BTH-11":[{"base":"profitability","name":"Profitability","fit":"full","when":"Profits are falling and you need to find where.","over":{"prev":{"st":"dropped","s":"closed on sight"},"pprice":{"st":"dropped","s":"market-set"},"pvol":{"st":"dropped","s":"flat"},"pcost":{"st":"changed","s":"the whole case"},"pfx":{"st":"same","s":"10 ageing plants"},"pvc":{"st":"same","s":"coal · labour · wires"},"pext":{"st":"changed","s":"constraints, not causes"}},"add":[],"ann":[["Revenue","Closed on the first pass — price is market-set and volume is flat. Say why you are closing it; don't just skip it."],["Cost","The whole case; and it is never quantified once."],["External","Deregulated usage, regulated transmission — constraints, not causes."]],"note":"A profitability tree whose revenue branch is closed by the facts you are given is the ideal case opening: it tells you where to spend the next fifteen minutes."},{"base":"chain","name":"Value chain","fit":"full","when":"When you know the problem is cost and need somewhere to stand.","over":{"inp":{"st":"same","s":"acquiring coal"},"opsn":{"st":"same","s":"generating"},"dist":{"st":"same","s":"transmitting"}},"add":[],"ann":[["Inputs","Acquiring coal — transport, third-party price, quality, unionised labour."],["Operations","Generating — old units, ten plants run differently, environmental rules."],["Distribution","Transmitting — distance to customers, sharing someone else's wires."]],"note":"Grafted straight onto the cost branch of the tree above. That graft is the move worth copying."},{"base":"makebuy","name":"Make vs buy","fit":"partial","when":"When the client owns a step in its own supply chain and wonders whether to keep it.","over":{"cmake":{"st":"changed","s":"'30% cheaper' — wrong"},"cbuy":{"st":"changed","s":"market price = forgone"},"qual":{"st":"dropped","s":"not in question here"},"strat":{"st":"changed","s":"security · quality · mix"}},"add":[{"parent":"strat","id":"risk","t":"Risk","s":"weather · politics"}],"ann":[["Cost to make","Looks 30% cheaper, and that comparison is wrong — burning your own coal costs what you could have sold it for."],["Cost to buy","The market price — which is also what you forgo by burning your own. The two branches collapse into one number."],["Strategic","Supply security, quality control, diversification: the real reasons to keep it."],["Risk","Hurricanes and political turmoil in the mining regions."]],"note":"The 'partial' flag is the point: the cost half of this framework collapses once you notice the opportunity cost, leaving only the strategic half to decide on."}],"BTH-02":[{"base":"pricing","name":"Pricing","fit":"full","when":"When the question is what to charge.","over":{"cplus":{"st":"dropped","s":"no cost data exists"},"cpet":{"st":"dropped","s":"no competitors"},"val":{"st":"changed","s":"the exhibit is this"},"obj":{"st":"same","s":"revenue, stated up front"}},"add":[],"ann":[["Cost-plus","Impossible — no cost data exists anywhere in this case."],["Competitive","Impossible — there are no competitors."],["Value-based","The only route left, and the exhibit is exactly that: willingness to pay."],["Objective","Stated up front as revenue, which is unusual and worth repeating back."]],"note":"Three of the four branches are closed by the facts. Saying which ones and why is a faster, better answer than listing all four."},{"base":"sizing","name":"Market sizing","fit":"full","when":"Whenever you need the ceiling on volume.","over":{"pop":{"st":"same","s":"100,000 surgeries / yr"},"filt":{"st":"dropped","s":"works in every one"},"freq":{"st":"same","s":"once per surgery"},"unitn":{"st":"same","s":"one — it's disposable"}},"add":[],"ann":[["Population","100,000 breast conservation surgeries a year."],["Filter","None — the device works in every one. A filter branch you can strike out is still worth naming."],["Frequency","Once per surgery."],["Units","One, because it is disposable. Had it been reusable the whole tree would change."]],"note":"The fastest sizing in the corpus, because every filter is handed to you. Ask whether a device is disposable before anything else."}],"BTH-05":[{"base":"profitability","name":"Profitability","fit":"partial","when":"The client wants to 'do better' and you need to find the lever.","over":{"prev":{"st":"changed","s":"the only live branch"},"pprice":{"st":"same","s":"+1.3% blended"},"pvol":{"st":"dropped","s":"assumed unchanged"},"pcost":{"st":"dropped","s":"client closed it"},"pfx":{"st":"dropped"},"pvc":{"st":"dropped"},"pext":{"st":"same","s":"raised at the end, as risk"}},"add":[],"ann":[["Revenue","The only live branch, and within it price rather than volume."],["Cost","Explicitly closed by the client — no savings available."],["External","Raised only at the end, as risks."]],"note":"Marked partial because two of its three branches are shut before you start. Building the full tree anyway costs you minutes you don't have."},{"base":"mix","name":"Pricing across a mix","fit":"full","when":"When price moves differ by product and you need the net effect.","over":{"root":{"st":"same","s":"+$39M vs a $30M target"},"line":{"st":"same","s":"five lines, five weights"},"chg":{"st":"same","s":"−2 · +1 · 0 · +2 · +4%"},"wt":{"st":"same","s":"5 · 20 · 30 · 30 · 15%"},"tot":{"st":"same","s":"$3B"},"summ":{"st":"changed","s":"−3 +6 +0 +18 +18 = $39M"}},"add":[],"ann":[["Price change","−2%, +1%, 0%, +2%, +4% across the five lines."],["Weight","5%, 20%, 30%, 30%, 15% of $3B. The weights are the reason you cannot average the percentages."],["Line contribution","−$3M, +$6M, $0, +$18M, +$18M."],["Sum","+$39M against a $30M target."]],"note":"The whole case is this one framework, applied properly. Percentages of different bases cannot be added — the weights are what make it work."}]};
 
 /* The casebook's OWN framework, as printed in the source, one entry per case that has one.
-   Node = SN(text, status, note, kids): status 'u' = the case actually uses it, 'n' = listed but never
-   used / never quantified, 'l' = used only as one lump. A node with no status is a grouping label. */
-const SN = (t,st,n,k)=>({t,st:st||"",n:n||"",k:k||[]});
+   N(text, o, kids): o.u = the step numbers where the case actually uses it; o.from = where the information
+   comes from: 'given' (in the prompt), 'ask' (the interviewer hands it over only if asked), 'calc' (you
+   work it out), 'none' (the case never supplies it); o.def = what the term means; o.why = why you need it;
+   o.n = what it comes to in this case. A node with no o.from is a grouping label. */
+const N = (t,o,k)=>Object.assign({t,k:k||[]},o||{});
 const SRCFW = {
 "BTH-01": {
-  src:"Booth 2025 · Case 1, p. 71",
-  hyp:"The PE firm should build the hotel.",
-  lead:"To validate that, I'd like to look at…",
-  how:"This is the structure the casebook wants to hear from you. Note the order: it opens with an answer (the working hypothesis) and then names what you would check to prove or kill it. Three families: the market (is there anyone to fill the hotel), profitability (does it pay) and the client (does it suit this buyer).",
-  branches:[
-   SN("Hotel market","","Is there anyone to sell rooms to, and who else is selling them?",[
-     SN("Competition","u","Step 3 — three hotels, only one a real rival",[
-       SN("Number of hotels","u","Three nearby: $110, $75, $40"),
-       SN("Location","u","All about 20 miles from the base")]),
-     SN("Customers","",null,[
-       SN("Soldiers","u","The only guest; trainees and people on rotation",[
-         SN("Proximity to base","u","The hotel sits on the base — rivals do not")])])]),
-   SN("Profitability","","Does it earn enough to repay the build?",[
-     SN("Revenues","",null,[
-       SN("Demand / occupancy","u","Step 4: 129,000 room-nights; Step 5 cuts it to 120,000"),
-       SN("Number of rooms","u","Step 5: 400 rooms; the shortage is only a peak window"),
-       SN("Pricing","u","Step 3: capped at $60",[
-         SN("Willingness to pay","n","Set aside — the Army's $75 budget decides, not what a soldier would pay")]),
-       SN("Non-occupancy revenues","n","Listed, never sized — yet it is the one lever left in Step 7")]),
-     SN("Costs","",null,[
-       SN("Capital expenses","u","Step 6",[
-         SN("Building / investment","u","400 × $50,000 = $20M, paid once"),
-         SN("Breakeven timeline","u","Step 7: $20M ÷ $3.2M = 6.25 years")]),
-       SN("Operational expenses","l","One lump of $4M a year, never split",[
-         SN("Labor","n","Never separated out"),
-         SN("Maintenance","n","Never separated out")])])]),
-   SN("Client interests (PE firm)","","Does this particular buyer want this particular deal?",[
-     SN("Portfolio mix","n","Never discussed"),
-     SN("Financial and operational investment goals","u","The 4–5 year payback hurdle, which you have to ask for"),
-     SN("Exit opportunities","n","Never discussed"),
-     SN("Opportunity cost","n","Listed, never computed — see the Toolkit")])]
+  src:"Booth 2025 · Case 1, p. 71", buildStep:2,
+  hyp:N("Working hypothesis: the PE firm should build the hotel",{u:[1,2,8],from:"given",
+    def:"An answer you commit to before you have any numbers, which the rest of the structure is built to test.",
+    why:"It stops you listing topics at random. Everything under it is something you would check to prove the hypothesis right or wrong.",
+    n:"The interviewer wants this said first. The numbers end up killing it: the case ends at 'don't build'."}),
+  kids:[
+   N("Hotel market",{u:[3,4],def:"Whether there is anyone to sell rooms to, and who else is already selling them.",
+     why:"Without customers there is no revenue, and a crowd of rivals caps your price. It is the cheapest test of the idea, so it comes first.",
+     n:"Small and countable here: one base, one kind of guest, three distant rivals."},[
+     N("Competition",{u:[3],def:"The other hotels a guest could choose instead of yours.",
+       why:"Competitors usually set the price you can charge.",n:"Only one of the three is a real rival, and even that one is 20 miles away."},[
+       N("Number of hotels",{u:[3],from:"ask",def:"How many alternative hotels sit near the base.",
+         why:"One rival and ten rivals are very different markets.",n:"Three: Hilton $110, Hampton Inn $75, Days Inn $40."}),
+       N("Location",{u:[3],from:"ask",def:"Where those hotels are relative to where the guests need to be.",
+         why:"A cheap hotel far away has a hidden cost in time and fuel.",n:"About 20 miles from the base, which is why they barely compete."})]),
+     N("Customers",{def:"The people who would actually stay.",why:"You size demand from who they are, not from a general market.",n:null},[
+       N("Soldiers",{u:[4],from:"ask",def:"The guests: trainees on courses and soldiers rotating to the base.",
+         why:"One kind of guest means demand can be counted rather than estimated.",n:"Three groups: basic trainees, advanced trainees, and soldiers on a 3-year rotation."},[
+         N("Proximity to base",{u:[1],from:"given",def:"How close the hotel is to where guests need to be every day.",
+           why:"Convenience is the product you are selling against the 20-mile rivals.",n:"The hotel is built on the base itself."})])])]),
+   N("Profitability",{u:[3,4,5,6,7],def:"Whether the hotel earns more than it costs, and whether it earns it back fast enough.",
+     why:"A busy hotel can still lose money. This is the branch that decides build or don't build.",
+     n:"Revenue $7.2M less running cost $4M leaves $3.2M a year against a $20M build."},[
+     N("Revenues",{u:[3,4,5],def:"Money coming in before any cost comes off.",why:"The top of the profit tree: everything else is subtracted from it.",
+       n:"Rooms sold times the rate: 120,000 × $60 = $7.2M."},[
+       N("Demand / occupancy",{u:[4,5],from:"calc",def:"How many room-nights guests want, and what share of the hotel's rooms that fills.",
+         why:"It is the volume half of revenue. Over-count it and every number after it is flattered.",n:"129,000 room-nights wanted, 120,000 that the hotel can actually house."}),
+       N("Number of rooms",{u:[5],from:"given",def:"How many rooms the hotel has to sell.",
+         why:"It is the physical ceiling on volume, however much demand there is.",n:"400 rooms, short by 80 a night for four peak months."}),
+       N("Pricing",{u:[3],from:"ask",def:"The rate you charge per room-night.",
+         why:"It is the price half of revenue, and in this case the one you cannot move.",n:"Capped at $60 by the Army's $75 allowance, which also has to pay for meals."},[
+         N("Willingness to pay",{from:"none",def:"The most a guest would choose to pay if left to decide.",
+           why:"Usually the limit on price. Here it is irrelevant because someone else is paying.",n:"Set aside: the Army's budget decides, not what a soldier would pay."})]),
+       N("Non-occupancy revenues",{u:[7,8],from:"none",def:"Money earned from guests beyond the room rate, such as a restaurant or conference space.",
+         why:"With price capped and rooms limited, it is the one lever left to shorten payback.",n:"Never sized in the case, but the model answer proposes a restaurant and army conferences as the fix."})]),
+     N("Costs",{u:[6],def:"Money going out, split into a one-off build and a yearly running bill.",
+       why:"They enter the decision differently, so they must be kept apart.",n:"$20M once and $4M a year."},[
+       N("Capital expenses",{u:[6],def:"Money spent once to create the asset.",why:"It has to be paid back out of future profit, so it sits outside the annual picture.",n:null},[
+         N("Building / investment",{u:[6],from:"ask",def:"What it costs to build the hotel.",
+           why:"It is the number the payback test divides into.",n:"400 rooms × $50,000 = $20M, borrowed from a comparable hotel."}),
+         N("Breakeven timeline",{u:[7],from:"ask",def:"How many years until profit has repaid the build cost.",
+           why:"A financial buyer judges a deal on how fast it gets its money back.",n:"$20M over $3.2M a year is 6.25 years, against the client's 4–5."})]),
+       N("Operational expenses",{u:[6],from:"ask",def:"The yearly cost of running the hotel.",
+         why:"It turns revenue into operating profit.",n:"$4M a year, given as one lump."},[
+         N("Labor",{from:"none",def:"Staff cost: front desk, housekeeping, kitchen.",why:"Usually the biggest running cost, and the place you would look to cut.",n:"Never split out of the $4M."}),
+         N("Maintenance",{from:"none",def:"Upkeep and repairs of the building.",why:"It grows as the building ages and is easy to forget.",n:"Never split out of the $4M."})])])]),
+   N("Client interests (PE firm)",{u:[1,7],def:"What this particular buyer needs from a deal, which is not the same as what any investor needs.",
+     why:"The same hotel can be a yes for one buyer and a no for another. The decision belongs to the client.",
+     n:"The firm's 4–5 year payback rule is what turns a 16% yearly return into a no."},[
+     N("Portfolio mix",{from:"none",def:"How a new investment fits the firm's other holdings.",why:"A deal can be fine alone and still unbalance the portfolio.",n:"Never discussed."}),
+     N("Financial and operational investment goals",{u:[7],from:"ask",def:"The returns and conditions the firm requires from an investment.",
+       why:"It supplies the pass mark you measure the result against.",n:"Payback within 4–5 years, which you only learn by asking."}),
+     N("Exit opportunities",{from:"none",def:"How and when the firm could sell the hotel and get its money out.",why:"A sale price at the end adds to the return.",n:"Never discussed."}),
+     N("Opportunity cost",{u:[8],from:"none",def:"What the same money could have earned in its best alternative use.",
+       why:"A deal has to beat the next best use of the money, not just beat zero.",n:"Named in the risks, never computed. See the Toolkit."})])]
  },
 "BTH-02": {
-  src:"Booth 2025 · Case 2, p. 76",
-  hyp:null,
-  lead:"The candidate should develop a framework that considers these drivers.",
-  how:"Here the casebook gives the drivers rather than a hypothesis, and expects you to build the structure and walk the interviewer through it. Most of its branches are settled by facts you are handed in the first two minutes; a few are never touched.",
-  branches:[
-   SN("Med-device market potential","","How many patients, and is that growing?",[
-     SN("Patient","",null,[
-       SN("Market size","u","100,000 breast conservation surgeries a year"),
-       SN("Growth trend","n","Never given or used")])]),
-   SN("Revenue potential","","Who has to say yes at each price?",[
-     SN("Provider / clinician adoption rate","u","The exhibit: adoption at each price point — the heart of the case"),
-     SN("Relationship with clinicians","n","Never raised"),
-     SN("Insurers' willingness to cover the cost","n","Never raised")]),
-   SN("The device","","Is it good enough to sell?",[
-     SN("Degree of innovation (substitutes)","u","No competitors at all"),
-     SN("Main features","",null,[
-       SN("Usable across surgeries","u","Works in every one"),
-       SN("Success / complication rate","u","100% success"),
-       SN("Useful life, quality","u","No quality concerns from R&D")]),
-     SN("Regulations","",null,[
-       SN("FDA compliance","u","Already approved"),
-       SN("Patent","n","Never raised")])])]
+  src:"Booth 2025 · Case 2, p. 76", buildStep:2,
+  hyp:N("Build a framework from these drivers and walk the interviewer through it",{u:[1,2],from:"given",
+    def:"The casebook gives the drivers and expects you to arrange them into a structure.",
+    why:"It tests whether you can organise a pricing question before you touch a number.",
+    n:"No hypothesis is given, so the order is yours."}),
+  kids:[
+   N("Med-device market potential",{u:[2],def:"How many patients could ever use the device.",why:"It sets the ceiling on volume.",n:"100,000 surgeries a year, once asked."},[
+     N("Patient",{def:"The people the device is used on.",why:"Demand starts with patients, not hospitals.",n:null},[
+       N("Market size",{u:[2],from:"ask",def:"The number of breast conservation surgeries a year.",why:"It is the most the device could sell in a year.",n:"100,000 a year, one device per surgery."}),
+       N("Growth trend",{from:"none",def:"Whether the number of cases is rising or falling.",why:"A growing market can justify a higher price today.",n:"Never given or used."})])]),
+   N("Revenue potential",{u:[3],def:"Who has to say yes to the device, and at what price.",why:"Revenue is price times buyers, and buyers depend on price.",n:"The exhibit gives adoption at each price."},[
+     N("Provider / clinician adoption rate",{u:[3],from:"ask",def:"The share of clinicians willing to use the device at each price.",
+       why:"It is the volume half of revenue and it falls as price rises.",n:"The exhibit: this is the heart of the case."}),
+     N("Relationship with clinicians",{from:"none",def:"Supplier contracts and trust between the firm and the surgeons.",why:"Strong relationships raise adoption.",n:"Never raised."}),
+     N("Insurers' willingness to cover the cost",{from:"none",def:"Whether insurance will pay for the device as part of the surgery.",why:"If nobody reimburses the hospital, adoption drops.",n:"Never raised."})]),
+   N("The device",{u:[2],def:"Whether the product is good enough to sell.",why:"A weak product undermines any pricing answer.",n:"Every question about the device comes back clean."},[
+     N("Degree of innovation (substitutes)",{u:[2],from:"ask",def:"Whether anything else does the same job.",why:"Substitutes limit the price you can charge.",n:"There are no competitors at all."}),
+     N("Main features",{def:"What the device does and how well it does it.",why:"Features set how much customers value it.",n:null},[
+       N("Usable across surgeries",{u:[2],from:"ask",def:"Whether it works in every breast conservation surgery.",why:"It decides how much of the market you can reach.",n:"Works in every one."}),
+       N("Success / complication rate",{u:[2],from:"ask",def:"How often the device works as intended.",why:"Safety drives clinician trust and adoption.",n:"100% success."}),
+       N("Useful life, quality",{u:[2],from:"ask",def:"How long it lasts and how well it is made.",why:"It decides whether you sell one unit per surgery or one for many.",n:"No quality concerns, and it is disposable."})]),
+     N("Regulations",{def:"Rules the device has to meet before it can be sold.",why:"No approval, no sales.",n:null},[
+       N("FDA compliance",{u:[2],from:"ask",def:"Whether the US regulator has approved the device.",why:"It is a gate on the whole market.",n:"Already approved."}),
+       N("Patent",{from:"none",def:"Legal protection against copycats.",why:"It protects the price you can hold.",n:"Never raised."})])])]
  }
 };
 const NX = Object.fromEntries(NODES.map(n=>[n.id,n]));
@@ -838,54 +866,38 @@ const CONCEPT = {
 "Price ceiling":{
   plain:"The highest price you can charge, set by something other than your own costs — usually by whoever is actually paying.",
   why:"When a third party reimburses (an employer, an insurer, a government), their budget caps your price no matter how good the product is. And a capped price means you cannot fix a bad return by charging more.",
-  math:{f:"p_max = A − m",
-        sym:[["p_max","the most you can charge per night"],["A","the payer's allowance per night"],["m","everything else that same allowance must also pay for"]],
-        read:"The most you can charge is what the payer hands over, minus whatever else that money has to buy.",
-        work:"Army Hotel: A = $75 a night, and it must also cover two meals. If the meals cost about $15 (the case never says), p_max = $75 − $15 = $60 — the rate the casebook uses from here on."},
+  math:{"forms": [{"f": "p_max = A − m", "tree": {"s": "p_max", "d": "the most you can charge per night", "op": "−", "k": [{"s": "A", "d": "what the payer allows per night"}, {"s": "m", "d": "everything else that allowance must also pay for"}]}}], "read": ["The most you can charge is what the payer hands over, less whatever else that money must buy", ["Payer gives A", "Part of it goes on other things (m)", "What is left is the room rate"]], "work": [["Army Hotel", ["A = $75 a night", ["The Army's per diem"], "m = breakfast + dinner ≈ $15", ["Assumed: the case never prices the meals"], "p_max = $75 − $15 = $60", ["The casebook fixes $60 from here on"]]]], "watch": [["Subtract everything the allowance must also buy", ["A $75 per diem that includes two meals is not a $75 room"]]]},
   here:"The hotel's price is not a choice. The Army reimburses $75 a night and that has to cover breakfast and dinner too, so about $60 is all the room can cost. The Hilton at $110 and the Hampton Inn at $75 are simply out of reach for a soldier on a per diem.",
   big:"Every case with a price in it starts with who pays and what their budget is. It reappears in Breast Cancer Surgery, where the limit is the customers' own willingness to pay instead of a payer's budget.",
   without:"You would quote $75 or even $110 like the neighbours, the soldiers would be paying part of every night out of their own pocket, and the revenue forecast would be too high before you have started on volume.",
   formula:"ceiling = what the payer allows − what else it has to cover",
-  watch:"Subtract everything the allowance must also buy. A $75 per diem that includes two meals is not a $75 room.",
   met:"Army Hotel"},
 "Breakeven":{
   plain:"The point where money in equals money out — expressed as a volume, a price, a share or a number of years.",
   why:"It converts a forecast into a threshold. 'We'll make $70,000' invites an argument; 'we break even at a 10% share and we expect 12.5%' is a defensible answer.",
-  math:{f:"Q* = F ÷ (p − v)        T = I ÷ π",
-        sym:[["Q*","units you must sell to break even"],["F","fixed cost you have to cover"],["p","price per unit"],["v","variable cost per unit (so p − v is what each sale leaves over)"],["T","years to get an up-front outlay back"],["I","the one-off investment"],["π","operating profit per year"]],
-        read:"Q*: every sale leaves p − v after its own cost, and breakeven is how many of those it takes to pay off F. T: the same idea for a one-off outlay — how many years of profit repay it.",
-        work:"Army Hotel uses the second form. I = $20M to build, π = $3.2M a year, so T = $20M ÷ $3.2M = 6.25 years. The client wants 4–5 years, so it misses by about a year and a quarter."},
+  math:{"forms": [{"label": "In units", "f": "Q* = {F|p − v}", "tree": {"s": "Q*", "d": "units you must sell to break even", "op": "÷", "k": [{"s": "F", "d": "fixed cost to cover"}, {"s": "p − v", "d": "what each sale leaves over", "op": "−", "k": [{"s": "p", "d": "price per unit"}, {"s": "v", "d": "variable cost per unit"}]}]}}, {"label": "In years", "f": "T = {I|π}", "tree": {"s": "T", "d": "years to get the outlay back", "op": "÷", "k": [{"s": "I", "d": "the one-off investment"}, {"s": "π", "d": "operating profit per year"}]}}], "read": ["In units: how many sales it takes to pay off the fixed cost", ["Each sale leaves p − v after its own cost", "Divide the fixed cost by that leftover"], "In years: how long the profit takes to repay a one-off outlay", ["Same idea, with years in place of units"]], "work": [["Army Hotel uses the years form", ["I = $20M to build", "π = $3.2M a year", "T = {$20M|$3.2M} = 6.25 years", ["The client wants 4–5 years, so it misses by about 1¼ years"]]]], "watch": [["Divide by contribution, never by revenue", ["The units have to match: p − v, not p"]]]},
   here:"The client is a financial buyer who wants its money back in 4–5 years. A $3.2M annual profit sounds fine until you divide the $20M build into it and get 6.25 years — that division, not the profit, decides the case.",
   big:"Breakeven turns a forecast into a pass/fail threshold, whether it is measured in units, price, share or years. Later cases use it as a breakeven share, and Cleaning Products asks for the price move that just covers a target.",
   without:"You would stop at '$3.2M a year', which looks healthy, and recommend building a hotel the client would reject.",
   formula:"breakeven volume = fixed cost ÷ contribution per unit",
-  watch:"Divide by contribution, never by revenue — the units have to match.",
   met:"Army Hotel"},
 "Capacity":{
   plain:"The most you can physically produce or serve, regardless of how much demand exists.",
   why:"Demand you cannot house is not revenue. A constraint that bites only in a peak window still cuts the whole year's number.",
-  math:{f:"S = min(D, K)",
-        sym:[["S","what you can actually sell"],["D","how much customers want"],["K","the most you can serve"]],
-        read:"You sell whichever is smaller: what people want, or what you can serve. Demand beyond capacity is lost, not banked.",
-        work:"Army Hotel: demand D = 129,000 room-nights a year. In the four busiest months the hotel is 80 rooms a night short, so 80 × 4 × 30 = 9,600 nights are turned away. S = 129,000 − 9,600 ≈ 120,000, and 120,000 × $60 = $7.2M. Check the whole year first and you are fooled: 400 rooms × 365 = 146,000 nights, comfortably above demand."},
+  math:{"forms": [{"f": "S = min(D, K)", "tree": {"s": "S", "d": "what you can actually sell", "op": "smaller of", "k": [{"s": "D", "d": "what customers want"}, {"s": "K", "d": "the most you can serve"}]}}], "read": ["You sell whichever is smaller: what people want or what you can serve", ["Demand beyond capacity is lost, not banked for later"]], "work": [["Army Hotel", ["D = 129,000 room-nights a year", "Peak shortage: 80 rooms × 4 months × 30 days = 9,600 nights turned away", "S = 129,000 − 9,600 ≈ 120,000", ["120,000 × $60 = $7.2M"], "The whole year looks fine on average", ["400 rooms × 365 = 146,000 nights, above demand, so the peak hides inside the average"]]]], "watch": [["Test capacity against the peak, not the average", ["An annual figure hides a four-month shortage completely"]]]},
   here:"The hotel does not run short all year, only for four months, and the casebook's first revenue figure of $7.8M quietly assumes every guest gets a room. The correct number is $7.2M.",
   big:"Every volume forecast has a ceiling on the supply side as well as the demand side. Electric Utility comes back to it as utilisation, from the other direction: a plant that has to meet the peak looks half-empty on average.",
   without:"You would hand over $7.8M of revenue that the hotel cannot physically earn, and every number after it (profit, payback) would be flattered by the same mistake.",
   formula:"sellable volume = min(demand, capacity)",
-  watch:"Test capacity against the peak, not the average — an annual figure hides a four-month shortage completely.",
   met:"Army Hotel"},
 "Non-occupancy revenue":{
   plain:"Money a business earns from its customers other than the headline price of the thing it exists to sell. For a hotel, 'occupancy' revenue is the room rate; everything else the guest pays for is non-occupancy.",
   eg:"In general: a hotel's restaurant, bar, spa, parking and conference rooms; an airline's baggage fees; a cinema's popcorn; a stadium's food stalls. In the Army Hotel: a restaurant for soldiers who are not yet on the base meal plan, rooms rented for army conferences, vending and laundry.",
   why:"Rooms are the product, but they are rarely the only source of money. Because a guest is already there, extra sales cost little to win and often carry a better margin than the room.",
-  math:{f:"R_total = p × Q + N        T = I ÷ (π + n)",
-        sym:[["p × Q","room revenue: rate times room-nights sold"],["N","non-occupancy revenue"],["I","the one-off investment"],["π","operating profit per year from rooms"],["n","extra profit per year from N, after what it costs to run it"]],
-        read:"Total revenue is rooms plus everything else. The part that helps payback is only what is left of N after its own costs, so measure n, not N.",
-        work:"Army Hotel: the case gives no figure (illustration only). Suppose a restaurant and conference rooms net an extra $0.8M a year. Then T = $20M ÷ ($3.2M + $0.8M) = 5.0 years, which just reaches the client's 4–5 year hurdle instead of missing it at 6.25."},
+  math:{"forms": [{"f": "R_total = (p × Q) + N", "tree": {"s": "R_total", "d": "everything the business earns", "op": "+", "k": [{"s": "p × Q", "d": "room revenue", "op": "×", "k": [{"s": "p", "d": "room rate"}, {"s": "Q", "d": "room-nights sold"}]}, {"s": "N", "d": "non-occupancy revenue: restaurant, conferences, parking"}]}}, {"label": "Effect on payback", "f": "T = {I|π + n}", "tree": {"s": "T", "d": "years to get the outlay back", "op": "÷", "k": [{"s": "I", "d": "the one-off investment"}, {"s": "π + n", "d": "yearly profit including extras", "op": "+", "k": [{"s": "π", "d": "profit from rooms"}, {"s": "n", "d": "profit from N after what it costs to run"}]}]}}], "read": ["Total revenue is rooms plus everything else", ["Rooms: rate times room-nights", "Everything else: N"], "Only the profit left from N helps payback", ["That is n, not N", "A restaurant that earns $1M and costs $1M adds nothing"]], "work": [["Army Hotel (illustration only: the case gives no figure)", ["Suppose a restaurant and conference rooms net n = $0.8M a year", "T = {$20M|$3.2M + $0.8M} = 5.0 years", ["Reaches the client's 4–5 year hurdle instead of missing it at 6.25"]]]], "watch": [["A figure for N is not a figure for profit", ["Measure n, after the cost of running it"]]]},
   here:"Rooms alone fail the client's payback test, and the per diem stops you raising the room rate. Non-occupancy revenue is the one lever left that can shorten payback, which is why the casebook lists it, then the model answer names a restaurant and army conferences as the fix.",
   big:"The same pattern recurs in any business that sells a main product plus add-ons. When the price of the main thing is capped, the add-ons are where the room to improve sits.",
   without:"With price capped and volume limited, the hotel looks like a dead end and you would say no without testing the one thing that could change the answer.",
-  watch:"A figure for N is not a figure for profit. A restaurant that brings in $1M and costs $1M to run adds nothing.",
   met:"Army Hotel"},
 "Structure without data":{
   plain:"Building a usable framework when the case gives you almost no numbers at all.",
@@ -895,15 +907,11 @@ const CONCEPT = {
 "Opportunity cost":{
   plain:"What you give up by choosing one option — the value of the next best thing you didn't do.",
   why:"It is the most commonly missed cost in a case, because nothing appears on an invoice for it. Using something you own is not free if you could have sold it.",
-  math:{f:"economic profit = accounting profit − return forgone elsewhere",
-        sym:[["accounting profit","revenue minus the costs you actually pay"],["return forgone elsewhere","what the same money or asset would have earned in its best alternative use"]],
-        read:"A project only creates value if it beats the next best use of the same resources, not just if it beats zero.",
-        work:"Army Hotel (our framing; the casebook lists opportunity cost and never computes it): the client's own 4–5 year payback means it expects to earn about 20% a year on invested money (1 ÷ 5). On $20M that is $4M a year forgone, against a hotel profit of $3.2M, so economic profit is about −$0.8M a year. The hotel earns money and still loses to the alternative."},
+  math:{"forms": [{"f": "EP = π − (I × r)", "tree": {"s": "EP", "d": "economic profit", "op": "−", "k": [{"s": "π", "d": "accounting profit: revenue less costs actually paid"}, {"s": "I × r", "d": "return forgone elsewhere", "op": "×", "k": [{"s": "I", "d": "money tied up in this project"}, {"s": "r", "d": "what that money would earn in its best alternative"}]}]}}, {"label": "Where r comes from here", "f": "r = {1|T}", "tree": {"s": "r", "d": "the yearly return the client expects", "op": "÷", "k": [{"s": "1", "d": "the whole investment"}, {"s": "T", "d": "the payback years the client demands"}]}}], "read": ["A project only creates value if it beats the next best use of the same money", ["Beating zero is not enough"]], "work": [["Army Hotel (our framing: the casebook lists this and never computes it)", ["T = 5 years at the top of the client's range", "r = {1|5} = 20% a year", "I × r = $20M × 20% = $4M a year forgone", "EP = $3.2M − $4M = −$0.8M a year", ["The hotel makes money and still loses to the alternative"]]]], "watch": [["Check the units and any footnote first", ["'$000s' is the difference between ten students and ten thousand"]]]},
   here:"In the Army Hotel the land is free, so it is tempting to say the hotel costs only the building. The cost that matters is the $20M itself: tied up here, it cannot earn what the firm's other deals would pay.",
   big:"This is the idea behind every 'should we do this' question: compare against the best alternative, not against doing nothing. Electric Utility returns to it when the company's own coal turns out to cost what it could have been sold for.",
   without:"Any project that makes a profit looks worth doing, so you would approve deals that make less than the client could have earned by simply doing something else.",
   formula:"true cost of using it = what someone else would have paid for it",
-  watch:"Check the units and any footnote first. '$000s' is the difference between ten students and ten thousand.",
   met:"Breast Cancer Surgery"},
 "Value chain":{
   plain:"The sequence of steps a business runs through to turn inputs into something a customer buys.",
@@ -925,15 +933,11 @@ const CONCEPT = {
 "Revenue maximisation":{
   plain:"Finding the price that earns the most money in total — not the highest price, and not the most customers.",
   why:"Think of selling tickets to a concert. At $1 the hall is full and you collect almost nothing. At $1,000 a single fan turns up and you collect $1,000. Every price change does two things at once: it changes what each buyer pays and it changes how many buyers there are, and the two pull in opposite directions. Raise the price and each buyer pays more but fewer come; lower it and more come but each pays less. Your total takings are biggest somewhere between the extremes, and you find that price by testing. Plotted against price, the total rises, peaks and falls, which is why people draw it as a hill. The hill is only the picture; the tug-of-war between price and buyers is the reason.",
-  math:{f:"R(p) = p × Q(p)        choose p* so that R(p*) ≥ R(p) for every price p you tested",
-        sym:[["R(p)","total revenue if you charge p"],["p","the price"],["Q(p)","how many buy at that price (it falls as p rises)"],["p*","the price with the highest revenue"]],
-        read:"Revenue is price times the number who buy at that price. Because the number who buy shrinks as price grows, the two factors fight, and you compute R at each candidate price and pick the largest.",
-        work:"Breast Cancer Surgery gives the full table: $300 × 75,000 = $22.5M; $600 × 50,000 = $30M; $1,000 × 10,000 = $10M. The peak is $600. Army Hotel gives only one point ($60 × 120,000 = $7.2M) because the Army fixes the price, so there is nothing to maximise there."},
+  math:{"forms": [{"f": "R(p) = p × Q(p)", "tree": {"s": "R(p)", "d": "total revenue at price p", "op": "×", "k": [{"s": "p", "d": "the price"}, {"s": "Q(p)", "d": "how many buy at that price; falls as p rises"}]}}, {"label": "The goal", "f": "p* = the p with the largest R(p)", "tree": {"s": "p*", "d": "the revenue-maximising price", "op": "compare", "k": [{"s": "R(p) at each price", "d": "work it out for every price you can test"}]}}], "read": ["Revenue is price times the number who buy at that price", ["The two factors pull in opposite directions", "So you work R out at each candidate price"], "Pick the price with the biggest result", ["Not the highest price, not the fullest hall"]], "work": [["Breast Cancer Surgery gives the full table", ["$300 × 75,000 = $22.5M", "$600 × 50,000 = $30M", ["The peak"], "$1,000 × 10,000 = $10M"]], ["Army Hotel gives one point only", ["$60 × 120,000 = $7.2M", "The Army fixes the price, so there is nothing to maximise"]]], "watch": [["Revenue-maximising is not profit-maximising", ["Say so, especially when the case never gives costs"]]]},
   here:"Not used in the Army Hotel, and that is the point: the per diem fixes the price, so the case has no price to optimise. It first matters in Breast Cancer Surgery, where the hospitals' willingness to pay does the choosing.",
   big:"Whenever you control a price, you are choosing a point on a trade-off between what each customer pays and how many there are. Knowing the shape stops you defaulting to 'highest price' or 'most customers'.",
   without:"You would pick a price by instinct, usually the highest or the one that fills the hall, and could leave a large share of the money on the table.",
   formula:"revenue = price × (market × adoption at that price)",
-  watch:"Revenue-maximising is not profit-maximising. Say so, especially when the case never gives you costs.",
   met:"Breast Cancer Surgery"},
 "Weighted mix":{
   plain:"Combining changes across several products by weighting each one by how much money it actually represents.",
