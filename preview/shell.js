@@ -1401,6 +1401,7 @@ function drawConcept(){
   const symMap = {};
   const collect = n => { if(/^[A-Za-zπ][A-Za-z0-9_*()]*$/.test(n.s)) symMap[n.s] = n.d; (n.k||[]).forEach(collect); };
   if(m) m.forms.forEach(f=>collect(f.tree));
+  if(m && m.watchMath) m.watchMath.forms.forEach(f=>collect(f.tree));
   const symNames = Object.keys(symMap).sort((a,b)=>b.length-a.length);
   const symRe = symNames.length ? new RegExp('(^|[^A-Za-z0-9_])(' + symNames.map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|') + ')(?![A-Za-z0-9_])','g') : null;
   const wrapSym = h => symRe ? h.replace(symRe, (all, pre, sy)=>`${pre}<span class="msym" tabindex="0" role="button" aria-label="${esc(sy)}: ${esc(symMap[sy])}">${sy}<span class="mtip"><b>${sy}</b> ${esc(symMap[sy])}</span></span>`) : h;
@@ -1417,6 +1418,9 @@ function drawConcept(){
       <div class="cformula cmath">${fmtF(f.f)}</div>
       <ul class="mtree">${ltree(f.tree)}</ul></div>`).join('')
     : (d.formula?`<span class="lab">The shape of it</span><div class="cformula">${esc(d.formula)}</div>`:'');
+  const watchMathHTML = w => `<div class="wmath"><span class="lab">The math behind it</span>` +
+    w.forms.map(f=>`<div class="cform">${f.label?`<span class="lab">${esc(f.label)}</span>`:''}<div class="cformula cmath">${fmtF(f.f)}</div><ul class="mtree">${ltree(f.tree)}</ul></div>`).join('') +
+    (w.work?`<span class="lab">Worked through, in the case</span>${bul(w.work)}`:'') + `</div>`;
   const trio = (d.here||d.big||d.without) ? `<div class="ctrio">
       ${d.here?`<div><span class="lab">Why it matters in this case</span><p>${esc(d.here)}</p></div>`:''}
       ${d.big?`<div><span class="lab">How it connects to the bigger picture</span><p>${esc(d.big)}</p></div>`:''}
@@ -1424,7 +1428,7 @@ function drawConcept(){
   const bullets = m ? `<div class="cbul">
       <div><span class="lab">Reading it</span>${bul(m.read)}</div>
       <div><span class="lab">Worked</span>${bul(m.work)}</div>
-      ${m.watch?`<div class="cwatchbox"><span class="lab">Watch out</span>${bul(m.watch)}</div>`:''}</div>` : '';
+      ${m.watch?`<div class="cwatchbox"><span class="lab">Watch out</span>${bul(m.watch)}${m.watchMath?watchMathHTML(m.watchMath):''}</div>`:''}</div>` : '';
   el.innerHTML = `
     <div><h4>${esc(conceptOpen)}</h4>
       <span class="lab">In plain terms</span><p>${esc(d.plain)}</p>

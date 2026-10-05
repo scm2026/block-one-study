@@ -965,3 +965,6 @@ html.fwdock #fwcard .fwwhen b, html.fwdock #fwcard .fwverdict b{font:600 9px "IB
 .inddefs dd b{font-weight:600; color:var(--ink)}
 .fwtip .here.ind .indhere{margin:4px 0 0; color:var(--ink)}
 .fwtip .here.ind .indhere b{font-weight:600}
+
+.cwatchbox .wmath{margin-top:10px; padding-top:8px; border-top:1px dashed color-mix(in srgb, var(--ink) 20%, transparent)}
+.cwatchbox .wmath .cform{margin:6px 0 8px}
