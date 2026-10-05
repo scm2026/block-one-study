@@ -1,5 +1,13 @@
 /* Diagnostics switch (preview): the debug boxes are ON by default while we are testing. Hide them with ?diag=0 on
    the URL (it sticks in this browser); bring them back with ?diag=1. */
+/* Frameworks in play now lives inside the Framework tree window. ?fw=old brings back the old bar at the top of the page
+   (and keeps it); ?fw=new returns to the window. */
+try{
+  if(/[?&]fw=old\b/.test(location.search)) localStorage.setItem('blockFW', 'old');
+  if(/[?&]fw=new\b/.test(location.search)) localStorage.removeItem('blockFW');
+  window.FWDOCK = localStorage.getItem('blockFW') !== 'old';
+}catch(err){ window.FWDOCK = !/[?&]fw=old\b/.test(location.search); }
+if(window.FWDOCK) document.documentElement.classList.add('fwdock');
 try{
   /* diagnostics are OFF by default; ?diag=1 turns them on and keeps them on, ?diag=0 turns them off again */
   if(/[?&]diag=1\b/.test(location.search)) localStorage.setItem('blockDiag', '1');
@@ -788,8 +796,11 @@ let fwOpen = null;
 function drawFrameworks(c){
   const card = document.getElementById('fwcard');
   const list = (typeof FW !== 'undefined' && FW[c.id]) || null;
-  if(!list){ card.hidden = true; card.innerHTML = ""; return; }
+  const ttab = document.querySelector('.ttabs [data-tt="fw"]');
+  if(ttab) ttab.hidden = !list;
+  if(!list){ card.hidden = true; card.innerHTML = ""; if(window.FWDOCK){ const pb = document.querySelector('#peekTree .pbody'); if(pb) pb.className = pb.className.replace(/\btt-fw\b/,'tt-step'); } return; }
   card.hidden = false;
+  if(window.FWDOCK && fwOpen === null) fwOpen = 0;
   const f = (fwOpen !== null && list[fwOpen]) ? list[fwOpen] : null;
   card.innerHTML = `
     <div class="toolhead"><h3>Frameworks in play</h3>
@@ -851,14 +862,14 @@ document.addEventListener('click', e=>{
 /* The frameworks strip sticks to the top and the step rail centres itself in what is left; both need to know how tall things are. */
 function updateSticky(){
   const r = document.documentElement.style, f = document.getElementById('fwcard'), st = document.getElementById('steps');
-  r.setProperty('--stripH', (f && !f.hidden ? f.offsetHeight + 8 : 0) + 'px');
+  r.setProperty('--stripH', (!window.FWDOCK && f && !f.hidden ? f.offsetHeight + 8 : 0) + 'px');
   r.setProperty('--rh', (st ? st.scrollHeight : 120) + 'px');
 }
 window.addEventListener('resize', updateSticky);
 function scrollToPanel(){
   const t = document.querySelector('.bodycol'), f = document.getElementById('fwcard');
   if(!t) return;
-  const y = t.getBoundingClientRect().top + window.scrollY - ((f && !f.hidden) ? f.offsetHeight : 0) - 14;
+  const y = t.getBoundingClientRect().top + window.scrollY - ((!window.FWDOCK && f && !f.hidden) ? f.offsetHeight : 0) - 14;
   window.scrollTo({top: Math.max(0, y), behavior: 'smooth'});
 }
 /* Small peek windows on the right edge. Hover enlarges one. A click lifts it out of the dock into a floating window that stays where you put it:
@@ -878,6 +889,19 @@ function buildDock(){
   };
   const pt = mk('peekTree', 'Framework tree', [tree, cap]), pn = mk('peekNotes', 'Notes so far', [fact]), ps = mk('peekSrc', 'Casebook framework', []);
   dock.append(pt, ps, pn); document.body.appendChild(dock);
+  if(window.FWDOCK){
+    const pb = pt.querySelector('.pbody'), fc = document.getElementById('fwcard');
+    if(fc){
+      pb.classList.add('tt-step');
+      const tabs = document.createElement('div'); tabs.className = 'ttabs';
+      tabs.innerHTML = '<button type="button" data-tt="step" aria-pressed="true">By step</button><button type="button" data-tt="fw" aria-pressed="false">Frameworks in play</button>';
+      pb.insertBefore(tabs, pb.firstChild); pb.appendChild(fc);
+      tabs.addEventListener('click', e=>{ const b = e.target.closest('button'); if(!b) return;
+        pb.classList.remove('tt-step','tt-fw'); pb.classList.add('tt-' + b.dataset.tt);
+        tabs.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed', String(x === b)));
+        if(b.dataset.tt === 'fw'){ try{ markTerms(fc); }catch(err){} if(typeof fwApply === 'function') fwApply(); } });
+    }
+  }
   /* Breakpoint lowered from 1099px to 1023px (2026-10): the iPad mini's Safari viewport is
      768px wide in portrait and 1024px in landscape -- both were under the old 1099px threshold,
      so the mini always got the narrow (static inline card) fallback below, in every orientation,
@@ -1272,9 +1296,11 @@ function buildRevealMode(){
   paint();
 }
 document.getElementById('fwcard').addEventListener('click', e=>{
+  const tg = e.target.closest('.fwtogbase');
+  if(tg){ const on = document.getElementById('fwcard').classList.toggle('showbase'); tg.textContent = on ? 'Hide the canned shape' : 'Compare with the canned shape'; return; }
   const b = e.target.closest('.fwbtn'); if(!b) return;
   const i = +b.dataset.f;
-  fwOpen = (fwOpen === i) ? null : i;
+  fwOpen = (fwOpen === i && !window.FWDOCK) ? null : i;
   fwZ = {k:FW_DEFAULT, tx:0, ty:0};
   fwFocused = false;
   drawFrameworks(CASES[ci]);
@@ -1468,6 +1494,24 @@ function fwPanel(f){
      "the canned shape" line — same per-framework text Sid wants everywhere this renders,
      since every case/framework goes through this one shared function. */
   const baseLab = f.when ? esc(f.when) : 'The canned shape — the same wherever this framework appears';
+  if(window.FWDOCK){
+    const sh = document.getElementById('fwcard') && document.getElementById('fwcard').classList.contains('showbase');
+    return `<div class="fwpanel dock">
+      ${f.when?`<p class="fwwhen"><b>Use it when</b> ${esc(f.when.replace(/^\s*/,'').replace(/\.$/,'').replace(/^./,m=>m.toLowerCase()))}.</p>`:''}
+      ${f.note?`<p class="fwverdict"><b>This case</b> ${esc(f.note)}</p>`:''}
+      <div class="fwtrees">
+        <div class="fwtree"><span class="lab">How this case bends it<i class="fwhint">hover a box for plain English · drag to move · scroll to zoom</i></span>${fwSVG(L, f, "bend")}
+          <div class="fwkey"><span><i class="same"></i>shape unchanged</span>
+            <span><i class="changed"></i>bent by this case</span>
+            ${nAdd?`<span><i class="added"></i>added by this case</span>`:''}
+            ${nDrop?`<span><i class="dropped"></i>closed by the facts</span>`:''}</div></div>
+        <div class="fwtree base"><span class="lab">The canned shape</span>${fwSVG(L, f, "base")}</div>
+      </div>
+      <button type="button" class="fwtogbase">${sh?'Hide the canned shape':'Compare with the canned shape'}</button>
+      ${f.ann && f.ann.length ? `<details class="fwanndet"><summary>Branch by branch</summary><div class="fwann">
+        ${f.ann.map(([k,v])=>`<div class="fwannrow"><b>${esc(k)}</b><span>${esc(v)}</span></div>`).join('')}</div></details>` : ''}
+    </div>`;
+  }
   return `<div class="fwpanel">
     <div class="fwtrees">
       <div class="fwtree"><span class="lab">${baseLab}<i class="fwhint">hover a box for plain English · drag to move · scroll to zoom</i></span>${fwSVG(L, f, "base")}</div>

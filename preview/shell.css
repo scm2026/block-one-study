@@ -895,3 +895,29 @@ html.nativeZoom body :not(.peek):not(.peek *):not(.rz):not(.splitter):not(.fwvie
 .sfnode.chg-add{border-style:dashed; border-color:var(--accent)}
 .sfsplit{background:var(--accent-soft); border-radius:3px; padding:2px 8px 4px; margin:4px 0}
 .sfchgwhy{border-top:1px dashed var(--line-2); margin-top:6px}
+
+/* ---- Frameworks in play inside the Framework tree window (html.fwdock); ?fw=old restores the top bar ---- */
+html.fwdock #fwcard{position:static; max-height:none; box-shadow:none; margin:0; padding:0; border:0; background:transparent}
+html.fwdock #fwcard:not([hidden]){display:block}
+html.fwdock #fwcard .fwpanel{overflow:visible; max-width:none}
+html.fwdock #fwcard .toolhead{display:none}
+html.fwdock #fwcard .fwbar{margin-bottom:8px}
+html.fwdock #fwcard .fwtrees{display:block}
+html.fwdock #fwcard .fwtree.base{display:none; margin-top:10px}
+html.fwdock #fwcard.showbase .fwtree.base{display:block}
+html.fwdock #fwcard .fwwhen, html.fwdock #fwcard .fwverdict{margin:0 0 6px; font-size:13px; line-height:1.45; color:var(--ink-2)}
+html.fwdock #fwcard .fwverdict{background:var(--accent-soft); border-left:3px solid var(--accent); padding:6px 10px; border-radius:2px; color:var(--ink)}
+html.fwdock #fwcard .fwwhen b, html.fwdock #fwcard .fwverdict b{font:600 9px "IBM Plex Mono",monospace; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); margin-right:6px}
+.fwtogbase{margin:8px 0 4px; font:600 11px "IBM Plex Mono",monospace; padding:5px 10px; border:1px solid var(--accent); background:transparent; color:var(--accent); border-radius:3px; cursor:pointer}
+.fwtogbase:hover{background:var(--accent-soft)}
+.fwanndet{margin-top:6px; font-size:13px}
+.fwanndet summary{cursor:pointer; font:600 11px "IBM Plex Mono",monospace; color:var(--ink-2)}
+.ttabs{display:flex; margin:0 0 8px}
+.ttabs button{font:600 11px "IBM Plex Mono",monospace; padding:5px 10px; border:1.5px solid var(--line-2); background:var(--panel); color:var(--ink-2); cursor:pointer}
+.ttabs button:first-child{border-radius:3px 0 0 3px}
+.ttabs button:last-child{border-radius:0 3px 3px 0; border-left:0}
+.ttabs button[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:#fff}
+.ttabs button[hidden]{display:none}
+.pbody.tt-step #fwcard{display:none !important}
+.pbody.tt-fw #tree, .pbody.tt-fw #treecap{display:none !important}
+@media(min-width:1024px){ .peek#peekTree:not(.open):not(.float) .ttabs{display:none} }
