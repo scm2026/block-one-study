@@ -202,7 +202,7 @@ function makeDraggable(el, handleSel, okFn){
     const r = el.getBoundingClientRect();
     st = {dx: e.clientX - r.left, dy: e.clientY - r.top, id: e.pointerId};
     try{ el.setPointerCapture(e.pointerId); }catch(err){}
-    el.classList.add('dragging'); e.preventDefault();
+    el.classList.add('dragging'); e.preventDefault(); e.stopPropagation();
   });
   el.addEventListener('pointermove', e=>{
     if(!st || e.pointerId !== st.id) return;
@@ -251,39 +251,67 @@ function drawSrcFw(c){
 }
 function indKnown(id){ try{ return JSON.parse(localStorage.getItem('blockInd:'+id)||'{}'); }catch(e){ return {}; } }
 function indSave(id,o){ try{ localStorage.setItem('blockInd:'+id, JSON.stringify(o)); }catch(e){} }
+const indOpen = new Set();
+let indFilter = 'all';
 function drawInd(c){
   const w = document.querySelector('#peekInd .pbody'); if(!w) return;
   const D = typeof INDUSTRY !== 'undefined' && INDUSTRY[c.id];
   const pc = document.querySelector('#peekInd .pc');
   if(!D){ w.innerHTML = '<p class="indnone">No industry notes for this case yet.</p>'; if(pc) pc.textContent = 'none'; return; }
-  const known = indKnown(c.id), step = si + 1;
+  const known = indKnown(c.id), step = si + 1, SC = {sector:'Sector', sub:'Sub-sector'};
   let n = 0, nk = 0;
   const srcLine = it => `<span class="indsrc">${it.url?`<a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.s)}</a>`:esc(it.s)}</span>`;
-  const html = D.sections.map((sec, a)=>{
-    const lit = sec.u.indexOf(step) >= 0;
-    return `<section class="indsec${lit?' lit':''}"><div class="indsh"><span>${esc(sec.h)}</span><i>${lit?'this step':'steps '+sec.u.join(' · ')}</i></div>
-      <p class="indintro">${esc(sec.intro)}</p>` + sec.items.map((it, b)=>{
-        const key = a + '.' + b; n++; if(known[key]) nk++;
-        return `<div class="inditem${known[key]?' known':''}" data-i="${key}">
-          <div class="indh">${esc(it.h)}</div>
-          <p><span class="ilab">The idea</span>${esc(it.idea)}</p>
+  const defs = it => it.defs && it.defs.length ? `<dl class="inddefs"><dt class="ilab">Words in this note</dt>${it.defs.map(([t,m])=>`<dd><b>${esc(t)}</b>: ${esc(m)}</dd>`).join('')}</dl>` : '';
+  const first2 = t => { const m = String(t).match(/^(.*?[.!?]\s+.*?[.!?])(\s|$)/); return m ? m[1] : t; };
+  const card = (key, scope, title, sum, body, extra) => {
+    const open = indOpen.has(key);
+    return `<div class="inditem${open?' open':''}${known[key]?' known':''}${scope?' sc-'+scope:''}" data-i="${key}" data-sc="${scope||''}">
+      <button type="button" class="indbtn" aria-expanded="${open}">
+        <span class="indtop">${scope?`<i class="indtag t-${scope}">${SC[scope]}</i>`:''}${known[key]?'<i class="indck">known ✓</i>':''}<span class="indchev" aria-hidden="true"></span></span>
+        <span class="indbt">${esc(title)}</span>
+        <span class="indsum">${esc(sum)}</span>
+      </button>
+      <div class="indbody">${body}${extra||''}</div></div>`;
+  };
+  const com = (key, o, scope) => card(key, '', o.h, first2(o.body), `<p><span class="ilab">What it is</span>${esc(o.body)}</p><p><span class="ilab">In this case</span>${esc(o.here)}</p>${defs(o)}<div class="indfoot">${srcLine(o)}</div>`);
+  const html = (D.sector ? com('sector', D.sector) : '') + (D.subsector ? com('subsector', D.subsector) : '') +
+    `<div class="indbar"><span class="indfl" role="group" aria-label="Show">${[['all','All'],['sector','Sector'],['sub','Sub-sector']].map(([k,l])=>`<button type="button" data-f="${k}" aria-pressed="${indFilter===k}">${l}</button>`).join('')}</span><button type="button" class="indall">${'Expand all'}</button></div>` +
+    D.sections.map((sec, a)=>{
+      const lit = sec.u.indexOf(step) >= 0;
+      const items = sec.items.map((it, b)=>[it, a + '.' + b]).filter(([it])=>indFilter === 'all' || it.scope === indFilter);
+      items.forEach(([it,key])=>{ n++; if(known[key]) nk++; });
+      sec.items.forEach((it,b)=>{ if(indFilter !== 'all' && it.scope !== indFilter){ n++; if(known[a+'.'+b]) nk++; } });
+      if(!items.length) return '';
+      return `<section class="indsec${lit?' lit':''}"><div class="indsh"><span>${esc(sec.h)}</span><i>${lit?'this step':'steps '+sec.u.join(' · ')}</i></div>
+        <p class="indintro">${esc(sec.intro)}</p>` + items.map(([it, key])=>card(key, it.scope, it.h, it.sum || first2(it.idea),
+          `<p><span class="ilab">The idea</span>${esc(it.idea)}</p>
           <p><span class="ilab">What the evidence shows</span>${esc(it.fact)}</p>
           <p><span class="ilab">In this case</span>${esc(it.here)}</p>
           ${it.sim?`<p><span class="ilab">Where the case simplifies</span>${esc(it.sim)}</p>`:''}
           ${it.ask?`<p class="indask"><span class="ilab">Ask this</span>&ldquo;${esc(it.ask)}&rdquo;</p>`:''}
-          ${it.defs&&it.defs.length?`<dl class="inddefs"><dt class="ilab">Words in this note</dt>${it.defs.map(([t,m])=>`<dd><b>${esc(t)}</b>: ${esc(m)}</dd>`).join('')}</dl>`:''}
-          ${it.note?`<p class="indnote">${esc(it.note)}</p>`:''}
-          <div class="indfoot">${srcLine(it)}<button type="button" class="indtick" aria-pressed="${known[key]?'true':'false'}">${known[key]?'I know this ✓':'I know this'}</button></div></div>`;
-      }).join('') + '</section>';
-  }).join('');
+          ${defs(it)}
+          ${it.note?`<p class="indnote">${esc(it.note)}</p>`:''}`,
+          `<div class="indfoot">${srcLine(it)}<button type="button" class="indtick" aria-pressed="${known[key]?'true':'false'}">${known[key]?'I know this ✓':'I know this'}</button></div>`)).join('') + '</section>';
+    }).join('');
   if(pc) pc.textContent = nk + '/' + n + ' known';
   w.innerHTML = `<p class="indsub">${esc(D.sub)}</p>` + html;
   try{ markTerms(w); }catch(err){}
 }
 document.addEventListener('click', e=>{
+  const f = e.target.closest && e.target.closest('#peekInd .indfl button');
+  if(f){ indFilter = f.dataset.f; drawInd(CASES[ci]); return; }
+  const all = e.target.closest && e.target.closest('#peekInd .indall');
+  if(all){ const items = [...document.querySelectorAll('#peekInd .inditem')]; const anyClosed = items.some(x=>!x.classList.contains('open'));
+    items.forEach(x=>{ if(anyClosed) indOpen.add(x.dataset.i); else indOpen.delete(x.dataset.i); }); drawInd(CASES[ci]); return; }
+  const bt = e.target.closest && e.target.closest('#peekInd .indbtn');
+  if(bt){ const it = bt.closest('.inditem'), k = it.dataset.i; const op = !it.classList.contains('open');
+    it.classList.toggle('open', op); bt.setAttribute('aria-expanded', String(op)); if(op) indOpen.add(k); else indOpen.delete(k);
+    const a = document.querySelector('#peekInd .indall'); if(a) a.textContent = [...document.querySelectorAll('#peekInd .inditem')].some(x=>!x.classList.contains('open')) ? 'Expand all' : 'Collapse all'; }
+});
+document.addEventListener('click', e=>{
   const b = e.target.closest && e.target.closest('.indtick'); if(!b) return;
   const c = CASES[ci], k = indKnown(c.id), i = b.closest('.inditem').getAttribute('data-i');
-  if(k[i]) delete k[i]; else k[i] = 1; indSave(c.id, k); drawInd(c);
+  if(k[i]) delete k[i]; else k[i] = 1; indSave(c.id, k); indOpen.add(i); drawInd(c);
 });
 function renderV2(c, s, v){
   const bk = c.book === 'kellogg';
@@ -2510,8 +2538,8 @@ if(window.visualViewport){
      no such competing surface - wheel-scrolling over one should simply pan the page like
      wheel-scrolling over any other text, exactly as it would if the SKIP list did not
      exist at all. */
-  const DRAG_SKIP = 'button,a,input,textarea,select,[contenteditable="true"],label,.term,.fwview,.peek,#dock,.rz,.askit';
-  const WHEEL_SKIP = '.fwview,.peek,#dock';
+  const DRAG_SKIP = 'button,a,input,textarea,select,[contenteditable="true"],label,.term,.fwview,.fwtip,.peek,#dock,.rz,.askit';
+  const WHEEL_SKIP = '.fwview,.fwtip,.peek,#dock';
   function overGlyph(x, y){
     let node = null, offset = 0;
     if(document.caretRangeFromPoint){
@@ -3341,7 +3369,8 @@ if(window.visualViewport){
 
   document.addEventListener('pointerdown', e=>{
     if(e.pointerType !== 'touch') return;
-    if(e.target && e.target.closest && e.target.closest('.fwview')){ diagLog(`down#${e.pointerId} fwview (skipped)`); return; }   /* fwBindZoom owns this */
+    if(e.target && e.target.closest && e.target.closest('.fwview')){ diagLog(`down#${e.pointerId} fwview (skipped)`); return; }
+    if(e.target && e.target.closest && e.target.closest('.fwtip')){ diagLog(`down#${e.pointerId} popup (skipped)`); return; }   /* fwBindZoom owns this */
     pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
     { const ta = diagTA(e.target), act = document.documentElement.classList.contains('pz-active');
       diagInfo.set(e.pointerId, {t: performance.now(), ta, act});

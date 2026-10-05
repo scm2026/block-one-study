@@ -983,3 +983,26 @@ html.fwdock #fwcard .fwwhen b, html.fwdock #fwcard .fwverdict b{font:600 9px "IB
 .cwatchbox .wsteps li{margin:0 0 9px}
 .cwatchbox .wsteps li p{margin:0 0 4px; font-size:13px; line-height:1.55}
 .cwatchbox .wsteps .cformula{margin:2px 0 0}
+
+/* ---- Industry lens: accordion ---- */
+.peek#peekInd.open{width:clamp(460px,44vw,680px)}
+.inditem{padding:0; overflow:hidden; opacity:1; border-left-width:3px}
+.indbtn{display:block; width:100%; text-align:left; background:none; border:0; padding:9px 12px 10px; cursor:pointer; font:inherit; color:inherit; position:relative}
+.indbtn:hover{background:color-mix(in srgb, var(--accent) 5%, transparent)}
+.indtop{display:flex; gap:6px; align-items:center; margin:0 0 3px}
+.indtag{font-style:normal; font-family:"IBM Plex Mono",monospace; font-size:8.5px; letter-spacing:.08em; text-transform:uppercase; padding:1px 6px; border-radius:9px; border:1px solid var(--line-2); color:var(--ink-3)}
+.indtag.t-sector{color:#1f5f8b; border-color:#9fc4de}
+.indtag.t-sub{color:#8a5a00; border-color:#e0bf80}
+.indck{font-style:normal; font-size:9.5px; color:var(--accent)}
+.indchev{margin-left:auto; width:9px; height:9px; border-right:2px solid var(--ink-3); border-bottom:2px solid var(--ink-3); transform:rotate(45deg); transition:transform .15s}
+.inditem.open .indchev{transform:rotate(-135deg)}
+.indbt{display:block; font-weight:600; font-size:13px; color:var(--ink); margin:0 0 3px}
+.indsum{display:block; font-size:12px; line-height:1.5; color:var(--ink-2)}
+.indbody{display:none; padding:2px 12px 10px; border-top:1px dashed var(--line)}
+.inditem.open .indbody{display:block}
+.inditem.open .indsum{display:none}
+.indbar{display:flex; justify-content:space-between; align-items:center; margin:10px 0 8px; gap:8px}
+.indfl{display:flex; gap:4px}
+.indfl button, .indall{font:inherit; font-size:11px; border:1px solid var(--line-2); background:transparent; color:var(--ink-2); border-radius:12px; padding:2px 10px; cursor:pointer}
+.indfl button[aria-pressed="true"]{border-color:var(--accent-line); color:var(--accent); background:color-mix(in srgb, var(--accent) 8%, transparent)}
+.inditem.known .indbt{opacity:.65}
