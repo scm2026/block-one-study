@@ -202,6 +202,36 @@ function drawSrcFw(c){
     if(window.ResizeObserver){ if(drawSrcFw._ro) drawSrcFw._ro.disconnect(); drawSrcFw._ro = new ResizeObserver(()=>{ const b = w.querySelector('.srcfw'); if(b) sfFit(b); }); drawSrcFw._ro.observe(w); }
   }
 }
+function indKnown(id){ try{ return JSON.parse(localStorage.getItem('blockInd:'+id)||'{}'); }catch(e){ return {}; } }
+function indSave(id,o){ try{ localStorage.setItem('blockInd:'+id, JSON.stringify(o)); }catch(e){} }
+function drawInd(c){
+  const w = document.querySelector('#peekInd .pbody'); if(!w) return;
+  const D = typeof INDUSTRY !== 'undefined' && INDUSTRY[c.id];
+  const pc = document.querySelector('#peekInd .pc');
+  if(!D){ w.innerHTML = '<p class="indnone">No industry notes for this case yet.</p>'; if(pc) pc.textContent = 'none'; return; }
+  const known = indKnown(c.id), step = si + 1;
+  const G = [['econ','How the sector makes money'],['twist','The twist in this sub-sector'],['ask','Sharper questions to ask'],['check','Reality check against the case']];
+  const n = D.items.length;
+  if(pc) pc.textContent = Object.keys(known).length + '/' + n + ' known';
+  w.innerHTML = `<p class="indsub">${esc(D.sub)}</p>` + G.map(([k,lab])=>{
+    const its = D.items.map((it,i)=>[it,i]).filter(x=>x[0].k===k); if(!its.length) return '';
+    return `<div class="indgrp"><div class="indlab">${lab}</div>` + its.map(([it,i])=>{
+      const lit = it.u.indexOf(step) >= 0;
+      return `<div class="inditem${lit?' lit':''}${known[i]?' known':''}" data-i="${i}">
+        <div class="indh">${esc(it.h)}${lit?'<span class="indnow">this step</span>':''}</div>
+        <p>${esc(it.t)}</p>
+        ${it.note?`<p class="indnote">${esc(it.note)}</p>`:''}
+        <div class="indfoot">${it.our?'<span class="indour">Our question / read, not a sourced fact</span>':
+          `<span class="indsrc">${it.url?`<a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.s)}</a>`:esc(it.s)}</span>`}
+          <button type="button" class="indtick" aria-pressed="${known[i]?'true':'false'}">${known[i]?'I know this ✓':'I know this'}</button></div></div>`;
+    }).join('') + '</div>';
+  }).join('');
+}
+document.addEventListener('click', e=>{
+  const b = e.target.closest && e.target.closest('.indtick'); if(!b) return;
+  const c = CASES[ci], k = indKnown(c.id), i = b.closest('.inditem').getAttribute('data-i');
+  if(k[i]) delete k[i]; else k[i] = 1; indSave(c.id, k); drawInd(c);
+});
 function renderV2(c, s, v){
   const bk = c.book === 'kellogg';
   const part = (label, inner) => inner ? `<div class="sub">${label}</div>${inner}` : "";
@@ -311,7 +341,39 @@ function drawToolkit(){
   el('toolkit').innerHTML =
     `<span class="lab">Toolkit<span class="cue">click any concept</span></span>${have || '<span class="chip none">empty</span>'}${nw}
      ${later?`<span class="lab" style="margin-left:8px">still to come</span>${later}`:''}`;
+  try{ tkFill(); }catch(e){}
 }
+/* Follow-me toolkit bar: when the real toolkit is scrolled out of view a slim fixed copy of its chips rides along the top of the
+   visible window (tracked through visualViewport exactly like the burger, so pinch-zoom does not strand it). Choosing a chip scrolls
+   back to the real toolkit and opens that concept there. Collapsed/expanded choice is remembered per reader. */
+function tkFill(){
+  const bar = document.getElementById('tkFollow'); if(!bar) return;
+  const tk = document.getElementById('toolkit'); if(!tk) return;
+  const chips = [...tk.querySelectorAll(':scope > .chip.have, :scope > .chip.new')].filter(c=>c.dataset.c);
+  bar.innerHTML = `<button type="button" class="tkf-lab" aria-expanded="${bar.classList.contains('min')?'false':'true'}" title="Collapse or expand the toolkit bar">Toolkit</button><span class="tkf-chips">` +
+    chips.map(c=>`<button type="button" class="chip ${c.classList.contains('new')?'new':'have'}" data-c="${esc(c.dataset.c)}" aria-pressed="${String(c.dataset.c===conceptOpen)}">${esc(c.dataset.c)}</button>`).join('') + '</span>';
+}
+function tkPlace(){
+  const bar = document.getElementById('tkFollow'), tk = document.getElementById('toolkit'); if(!bar || !tk) return;
+  const vv = window.visualViewport, L = vv ? vv.offsetLeft : 0, T = vv ? vv.offsetTop : 0, W = vv ? vv.width : innerWidth, H = vv ? vv.height : innerHeight;
+  const r = tk.getBoundingClientRect(), inView = r.bottom > 0 && r.top < H;
+  bar.hidden = inView || !bar.querySelector('.chip');
+  bar.style.left = Math.round(L + 52) + 'px'; bar.style.top = Math.round(T + 10) + 'px'; bar.style.maxWidth = Math.max(160, Math.round(W - 52 - 14)) + 'px';
+}
+(function(){
+  const bar = document.createElement('div'); bar.id = 'tkFollow'; bar.hidden = true;
+  try{ if(localStorage.getItem('blockTkMin') === '1') bar.classList.add('min'); }catch(e){}
+  document.body.appendChild(bar);
+  bar.addEventListener('click', e=>{
+    if(e.target.closest('.tkf-lab')){ bar.classList.toggle('min'); try{ localStorage.setItem('blockTkMin', bar.classList.contains('min')?'1':'0'); }catch(x){} tkFill(); return; }
+    const ch = e.target.closest('.chip'); if(!ch || !ch.dataset.c) return;
+    conceptOpen = ch.dataset.c; drawConcept(); markTerms(document.getElementById('toolkit'));
+    document.getElementById('toolkit').scrollIntoView({behavior:'smooth', block:'start'});
+  });
+  window.addEventListener('scroll', tkPlace, {passive:true}); window.addEventListener('resize', tkPlace);
+  if(window.visualViewport){ window.visualViewport.addEventListener('resize', tkPlace); window.visualViewport.addEventListener('scroll', tkPlace); }
+  setTimeout(()=>{ tkFill(); tkPlace(); }, 0);
+})();
 function drawRail(){
   el('rail').innerHTML = CASES.map((c,k)=>{
     const prev = k ? CASES[k-1].dials
@@ -364,7 +426,7 @@ function render(){
   const c = CASES[ci], s = c.steps[si];
   const v2 = V2[c.id] && V2[c.id][si];
   drawSparks(); drawToolkit(); drawConcept(); drawRail(); drawBridge(); drawTree(c, si);
-  drawFrameworks(c); drawFacts(c, si); drawSrcFw(c);
+  drawFrameworks(c); drawFacts(c, si); drawSrcFw(c); drawInd(c);
   fitColumn();
   const fig = s.fig && FIGS[s.fig];
   el('fig').innerHTML = fig ? FIGS[s.fig]() : "";
@@ -593,7 +655,7 @@ function buildShade(){
 
 buildTint();
 buildRevealMode();
-buildDock(); drawSrcFw(CASES[ci]);
+buildDock(); drawSrcFw(CASES[ci]); drawInd(CASES[ci]);
 buildShade();
 buildRailToggle();
 buildSplitLine();
@@ -887,8 +949,8 @@ function buildDock(){
     w.innerHTML = '<header><span class="pt">' + title + '</span><span class="pc"></span><button type="button" class="pclose" aria-label="Close ' + title + ' and return it to the side" title="Close: send it back to the side">✕</button></header><div class="pbody"></div>';
     nodes.filter(Boolean).forEach(n=>w.querySelector('.pbody').appendChild(n)); return w;
   };
-  const pt = mk('peekTree', 'Framework tree', [tree, cap]), pn = mk('peekNotes', 'Notes so far', [fact]), ps = mk('peekSrc', 'Casebook framework', []);
-  dock.append(pt, ps, pn); document.body.appendChild(dock);
+  const pt = mk('peekTree', 'Framework tree', [tree, cap]), pn = mk('peekNotes', 'Notes so far', [fact]), ps = mk('peekSrc', 'Casebook framework', []), pi = mk('peekInd', 'Industry lens', []);
+  dock.append(pt, ps, pi, pn); document.body.appendChild(dock);
   if(window.FWDOCK){
     const pb = pt.querySelector('.pbody'), fc = document.getElementById('fwcard');
     if(fc){
@@ -1315,6 +1377,7 @@ document.getElementById('fwcard').addEventListener('click', e=>{
 let conceptOpen = null;
 function drawConcept(){
   const box = document.getElementById('toolkit');
+  try{ tkFill(); }catch(e){}
   const old = box.querySelector('.cpanel');
   if(old) old.remove();
   [...box.querySelectorAll('.chip')].forEach(ch=>{
@@ -1374,6 +1437,7 @@ document.getElementById('toolkit').addEventListener('click', e=>{
   conceptOpen = (conceptOpen === ch.dataset.c) ? null : ch.dataset.c;
   drawConcept();
   markTerms(document.getElementById('toolkit'));
+  tkPlace();
 });
 
 
@@ -2042,6 +2106,10 @@ function fwTipFollow(){
 }
 function termFirst(p){ const m = String(p).match(/^.*?[.!?](?=\s|$)/); const t = m ? m[0] : String(p); return t.length > 240 ? t.slice(0,237) + '…' : t; }
 var _tipKey = '';   /* the exact key the reader hovered: tells an inflected form from the entry itself */
+function indTipHTML(g){
+  const c = termCase(); const n = g && g.ind && c && g.ind[c]; if(!n) return '';
+  return `<div class="here ind"><span class="lb">Industry lens</span><p>${esc(n.t)}</p><p class="indsrc">${esc(n.s)}</p></div>`;
+}
 function fwTipHTML(title, g, here, flag, ctx, rel){
   if(!g && !ctx) return '';   /* never show an empty card */
   const parts = g && g.parts && g.parts.length ? g.parts.map(k=>TERMS[k]).filter(Boolean) : [];
@@ -2056,6 +2124,7 @@ function fwTipHTML(title, g, here, flag, ctx, rel){
     (rel ? `<div class="here parts"><span class="lb">Part of the phrase</span><p><b>${esc(rel.d)}</b> — ${esc(termFirst(rel.p))}</p></div>` : '') +
     (flag ? `<span class="flag ${flag === 'closed by the facts' ? 'dropped':''}">${esc(flag)}</span>` : '') +
     (here ? `<div class="here"><span class="lb">In this case</span><p>${esc(here)}</p></div>` : '') +
+    indTipHTML(g) +
     fwCtxHTML(ctx) +
     (ctx && !fwPinned ? `<div class="hint">${termTouch ? 'Tap again to keep this open' : 'Click to keep this open'}</div>` : '');
 }

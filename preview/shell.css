@@ -921,3 +921,31 @@ html.fwdock #fwcard .fwwhen b, html.fwdock #fwcard .fwverdict b{font:600 9px "IB
 .pbody.tt-step #fwcard{display:none !important}
 .pbody.tt-fw #tree, .pbody.tt-fw #treecap{display:none !important}
 @media(min-width:1024px){ .peek#peekTree:not(.open):not(.float) .ttabs{display:none} }
+
+/* ---- Industry lens window ---- */
+.peek#peekInd.open{width:clamp(420px,40vw,620px)}
+.indsub{font-size:12px; color:var(--ink-2); margin:0 0 10px; line-height:1.5}
+.indnone{font-size:12.5px; color:var(--ink-3)}
+.indgrp{margin:0 0 12px}
+.indlab{font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); margin:0 0 6px}
+.inditem{border:1px solid var(--line); border-left:3px solid var(--line); border-radius:8px; padding:8px 10px; margin:0 0 7px; opacity:.72; transition:opacity .15s}
+.inditem.lit{opacity:1; border-left-color:var(--accent); background:color-mix(in srgb, var(--accent) 6%, transparent)}
+.inditem.known{opacity:.5}
+.inditem .indh{font-weight:600; font-size:12.5px; margin:0 0 3px; color:var(--ink)}
+.inditem p{margin:0 0 4px; font-size:12px; line-height:1.5; color:var(--ink-2)}
+.inditem .indnote{font-style:italic; color:var(--ink-3)}
+.indnow{margin-left:8px; font-family:"IBM Plex Mono",monospace; font-size:8.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--accent)}
+.indfoot{display:flex; justify-content:space-between; gap:8px; align-items:center; flex-wrap:wrap}
+.indsrc,.indour{font-size:10.5px; color:var(--ink-3)}
+.indsrc a{color:var(--accent)}
+.indtick{font:inherit; font-size:10.5px; border:1px solid var(--line); background:transparent; color:var(--ink-2); border-radius:12px; padding:2px 9px; cursor:pointer}
+.indtick[aria-pressed="true"]{border-color:var(--accent-line); color:var(--accent)}
+.fwtip .here.ind .indsrc{margin:2px 0 0; font-size:10.5px; color:var(--ink-3)}
+/* ---- follow-me toolkit bar ---- */
+#tkFollow{position:fixed; z-index:30; display:flex; align-items:center; gap:6px; padding:5px 8px; border:1px solid var(--line); border-radius:12px;
+  background:color-mix(in srgb, var(--panel) 92%, transparent); backdrop-filter:blur(6px); box-shadow:0 2px 10px rgba(0,0,0,.12)}
+#tkFollow[hidden]{display:none}
+#tkFollow .tkf-lab{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); background:none; border:0; cursor:pointer; padding:2px 4px; flex:none}
+#tkFollow .tkf-chips{display:flex; gap:6px; overflow-x:auto; scrollbar-width:thin; white-space:nowrap}
+#tkFollow .chip{flex:none}
+#tkFollow.min .tkf-chips{display:none}

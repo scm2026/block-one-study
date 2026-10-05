@@ -1471,3 +1471,23 @@ const V2B = {
 ]
 };
 const V2 = Object.assign({}, V2A, V2B);
+
+/* Industry lens: sourced sector notes per case. k: econ | twist | ask | check. u = steps (1-based) where it lights up.
+   Every factual item names publisher + date; our own reads are flagged our:true and are never presented as sourced. */
+const INDUSTRY = {
+ "BTH-01": { title:"Hotels on a military base", sub:"How this sector actually works, and where the case simplifies it. Sourced, dated, and labelled where it is our own read.",
+  items:[
+   {k:"econ", u:[3], h:"Lodging and meals are separate allowances", t:"Official travel reimburses the room and meals as two allowances. For FY2026 the standard rates are $110 for lodging and $68 for meals and incidentals. The case folds both into one $75, so the room-only ceiling is the number that matters.", s:"GSA, FTR Bulletin 26-01, FY2026"},
+   {k:"econ", u:[6], h:"Rooms are not the only revenue line", t:"In a 2016 industry sample, food and beverage was about 29% of hotel revenue. The sample leans toward full-service hotels, so a limited-service base hotel would likely earn a smaller share.", s:"CBRE Hotels Research, 2016", note:"The second sentence is our read, not a published figure."},
+   {k:"econ", u:[2,7], h:"Operators prefer to own less", t:"The five largest chains held about a third fewer assets per revenue dollar than in 2002, and the share of a hotel company's franchised hotels correlates 0.84 with its net margin. A buyer who owns the building is going against that grain.", s:"BCG, Sept 2014; McKinsey, May 2024", url:"https://www.bcg.com/publications/2014/business-model-innovation-growth-asset-light-is-right"},
+   {k:"twist", u:[1,4], h:"No promised occupancy", t:"For Army-base hotels, the Army stated it gave private investors no guarantee on the loan or on occupancy. The soldiers are expected demand, not contracted demand.", s:"U.S. Army, 2011"},
+   {k:"twist", u:[6,7], h:"The land is leased, and the deal is slow", t:"Enhanced use leases are the most common Army land deal. They take a long time and need legal, financial and real-estate specialists, so up-front cost includes time and deal complexity.", s:"RAND, RR2696, Sept 2019", url:"https://www.rand.org/pubs/research_reports/RR2696.html"},
+   {k:"twist", u:[7], h:"A 4-5 year hurdle sits against expensive debt", t:"In a 2023 survey, 89% of hoteliers called loan rates above 8% unacceptable, and the analysis warned of negative leverage, where debt lowers the equity return.", s:"BCG, June 2023", url:"https://www.bcg.com/publications/2023/unexpected-opportunities-from-rising-hotel-loan-interest-rates"},
+   {k:"twist", u:[7,8], h:"The exit market has recovered", t:"Direct hotel investment is up 22% from the 2023 trough, with record capital available. That supports assuming a buyer exists; it says nothing about a one-customer hotel on leased land, which is a narrower pool.", s:"JLL, Feb 2026", url:"https://www.jll.com/en-us/newsroom/2026-global-hotel-investment-outlook-report", note:"The narrower-pool point is our read."},
+   {k:"ask", u:[1,4], h:"Is the occupancy committed or only expected?", t:"The question that separates a contract from a forecast, and it changes the risk on the whole answer.", our:true},
+   {k:"ask", u:[3], h:"Is the $75 the room alone or the room plus meals?", t:"The case answers this for you. In a real interview the answer moves the price ceiling by a third or more.", our:true},
+   {k:"ask", u:[6,7], h:"Who owns the land, and for how long?", t:"Payback against a hurdle only means something if the investor controls the site for longer than the payback.", our:true},
+   {k:"check", u:[3], h:"One number instead of two", t:"The case's single $75 stands in for two separate allowances that change every October 1. Say so before relying on it.", our:true},
+   {k:"check", u:[6], h:"One build cost for the whole hotel", t:"The $20M build is a single figure. Real build cost varies by service level and by year; name it as an assumption you would verify.", our:true}
+  ]}
+};
