@@ -100,6 +100,30 @@ const revealed = new Set();                       /* 'CASE|step|askIndex' keys t
 const rkey = (cid, i, q) => cid + '|' + i + '|' + q;
 const isGated = (cid, i, q) => revealMode === 'practice' && !revealed.has(rkey(cid, i, q));
 
+/* The casebook's own framework (SRCFW, per case): one structured outline, used both in the side window
+   and inline on the Framework step. */
+function srcFwCount(nodes){ let u=0,n=0; (function w(a){ a.forEach(x=>{ if(x.st==='u'||x.st==='l')u++; else if(x.st==='n')n++; w(x.k); }); })(nodes); return {u,n}; }
+function srcFwHTML(id, inline){
+  const f = (typeof SRCFW !== 'undefined') && SRCFW[id];
+  if(!f) return `<p class="sfnone">This case has no casebook framework added here yet. The pilot covers Army Hotel and Breast Cancer Surgery.</p>`;
+  const lab = {u:'used',n:'never used',l:'used as one lump'};
+  const node = x => `<li class="sfn ${x.st?'st-'+x.st:'grp'}"><span class="sft">${esc(x.t)}</span>${x.st?`<span class="sfb">${lab[x.st]}</span>`:''}${x.n?`<span class="sfnote">${esc(x.n)}</span>`:''}${x.k.length?`<ul>${x.k.map(node).join('')}</ul>`:''}</li>`;
+  const cnt = srcFwCount(f.branches);
+  return `<div class="srcfw${inline?' inl':''}">
+    <p class="sfmeta">${esc(f.src)}</p>
+    ${f.hyp?`<div class="sfhyp"><span class="lab">Working hypothesis — said first</span><b>${esc(f.hyp)}</b><span class="sflead">${esc(f.lead)}</span></div>`
+            :`<div class="sfhyp"><span class="lab">What the book asks for</span><span class="sflead">${esc(f.lead)}</span></div>`}
+    <div class="sfcols">${f.branches.map(b=>`<div class="sfbr"><div class="sfh"><b>${esc(b.t)}</b>${b.n?`<span>${esc(b.n)}</span>`:''}</div><ul>${b.k.map(node).join('')}</ul></div>`).join('')}</div>
+    <p class="sfhow">${esc(f.how)}</p>
+    <p class="sfcount"><b>${cnt.u}</b> of its ${cnt.u+cnt.n} branches get used in this case; <b>${cnt.n}</b> are listed and never touched.</p>
+  </div>`;
+}
+function drawSrcFw(c){
+  const w = document.querySelector('#peekSrc .pbody'); if(!w) return;
+  w.innerHTML = srcFwHTML(c.id, false);
+  const pc = document.querySelector('#peekSrc .pc');
+  if(pc) pc.textContent = (typeof SRCFW !== 'undefined' && SRCFW[c.id]) ? 'book' : 'none';
+}
 function renderV2(c, s, v){
   const bk = c.book === 'kellogg';
   const part = (label, inner) => inner ? `<div class="sub">${label}</div>${inner}` : "";
@@ -156,8 +180,10 @@ function renderV2(c, s, v){
         : `<div class="att"><span class="tag a">${label}</span>${body}</div>`;
       const srcb = `<div class="src ${bk?'k':''}"><span class="tag s ${bk?'k':''}">Source · ${
           bk?'Kellogg 2020':'Booth 2025'}, ${esc(c.pages)}</span>
-          ${v.src.map(([l,t])=>`<div class="srcrow"><span class="l">${esc(l)}</span>
-            <p>${esc(t)}</p></div>`).join('')}</div>`;
+          ${v.src.map(([l,t])=>(t==='SRCFW' && typeof SRCFW!=='undefined' && SRCFW[c.id])
+            ? `<div class="srcrow"><span class="l">${esc(l)}</span>${srcFwHTML(c.id,true)}<button type="button" class="openfw" data-open="peekSrc">Keep this open in a side window</button></div>`
+            : `<div class="srcrow"><span class="l">${esc(l)}</span>
+            <p>${esc(t==='SRCFW'?'':t)}</p></div>`).join('')}</div>`;
       return sf ? srcb + att : att + srcb;
     })()}
     <div class="ours"><span class="tag o">Ours</span>
@@ -260,7 +286,7 @@ function render(){
   const c = CASES[ci], s = c.steps[si];
   const v2 = V2[c.id] && V2[c.id][si];
   drawSparks(); drawToolkit(); drawConcept(); drawRail(); drawBridge(); drawTree(c, si);
-  drawFrameworks(c); drawFacts(c, si);
+  drawFrameworks(c); drawFacts(c, si); drawSrcFw(c);
   fitColumn();
   const fig = s.fig && FIGS[s.fig];
   el('fig').innerHTML = fig ? FIGS[s.fig]() : "";
@@ -489,7 +515,7 @@ function buildShade(){
 
 buildTint();
 buildRevealMode();
-buildDock();
+buildDock(); drawSrcFw(CASES[ci]);
 buildShade();
 buildRailToggle();
 buildSplitLine();
@@ -780,8 +806,8 @@ function buildDock(){
     w.innerHTML = '<header><span class="pt">' + title + '</span><span class="pc"></span><button type="button" class="pclose" aria-label="Close ' + title + ' and return it to the side" title="Close: send it back to the side">✕</button></header><div class="pbody"></div>';
     nodes.filter(Boolean).forEach(n=>w.querySelector('.pbody').appendChild(n)); return w;
   };
-  const pt = mk('peekTree', 'Framework tree', [tree, cap]), pn = mk('peekNotes', 'Notes so far', [fact]);
-  dock.append(pt, pn); document.body.appendChild(dock);
+  const pt = mk('peekTree', 'Framework tree', [tree, cap]), pn = mk('peekNotes', 'Notes so far', [fact]), ps = mk('peekSrc', 'Casebook framework', []);
+  dock.append(pt, ps, pn); document.body.appendChild(dock);
   /* Breakpoint lowered from 1099px to 1023px (2026-10): the iPad mini's Safari viewport is
      768px wide in portrait and 1024px in landscape -- both were under the old 1099px threshold,
      so the mini always got the narrow (static inline card) fallback below, in every orientation,
@@ -911,6 +937,8 @@ function buildDock(){
     clampBox(w, r.left, r.top, r.width, r.height); raise(w);
     void w.offsetWidth; w.style.transition = '';
   };
+  window.DOCK_OPEN = id=>{ const w = document.getElementById(id); if(!w) return; if(narrow()){ w.scrollIntoView({behavior:'smooth',block:'start'}); return; } floatIt(w); raise(w); };
+  document.addEventListener('click', e=>{ const b = e.target.closest && e.target.closest('.openfw'); if(b && window.DOCK_OPEN) window.DOCK_OPEN(b.getAttribute('data-open')); });
   const unfloat = w=>{
     if(!w.classList.contains('float')) return;
     /* Diagnostic (see the drag-stop investigation, 2026-10): if unfloat() runs on a window
@@ -1202,14 +1230,26 @@ function drawConcept(){
   if(!d) return;
   const el = document.createElement('div');
   el.className = 'cpanel';
+  const m = d.math;
+  const mathHTML = m ? `<span class="lab">The math</span>
+      <div class="cformula cmath">${esc(m.f)}</div>
+      <dl class="csym">${m.sym.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+      <p><b>Reading it.</b> ${esc(m.read)}</p>
+      <p class="cwork"><b>Worked.</b> ${esc(m.work)}</p>`
+    : (d.formula?`<span class="lab">The shape of it</span><div class="cformula">${esc(d.formula)}</div>`:'');
+  const trio = (d.here||d.big||d.without) ? `<div class="ctrio">
+      ${d.here?`<div><span class="lab">Why it matters in this case</span><p>${esc(d.here)}</p></div>`:''}
+      ${d.big?`<div><span class="lab">How it connects to the bigger picture</span><p>${esc(d.big)}</p></div>`:''}
+      ${d.without?`<div><span class="lab">Without it</span><p>${esc(d.without)}</p></div>`:''}</div>` : '';
   el.innerHTML = `
     <div><h4>${esc(conceptOpen)}</h4>
       <span class="lab">In plain terms</span><p>${esc(d.plain)}</p>
-      <span class="lab">Why it matters in a case</span><p>${esc(d.why)}</p></div>
-    <div>${d.formula?`<span class="lab">The shape of it</span>
-      <div class="cformula">${esc(d.formula)}</div>`:''}
+      ${d.eg?`<span class="lab">Examples</span><p>${esc(d.eg)}</p>`:''}
+      <span class="lab">${d.here?'Why it matters in a case, generally':'Why it matters in a case'}</span><p>${esc(d.why)}</p></div>
+    <div>${mathHTML}
       ${d.watch?`<span class="lab">Watch out</span><p class="cwatch">${esc(d.watch)}</p>`:''}
-      <p class="cmet" style="margin-top:10px">First met in <b>${esc(d.met)}</b>.</p></div>`;
+      <p class="cmet" style="margin-top:10px">First met in <b>${esc(d.met)}</b>.</p></div>
+    ${trio}`;
   box.appendChild(el);
 }
 document.getElementById('toolkit').addEventListener('click', e=>{
