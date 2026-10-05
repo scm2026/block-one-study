@@ -121,7 +121,7 @@ function sfRoot(f, mode){ const t = f[mode] || f.printed; return Object.assign({
 function srcFwHTML(id, inline, mode){
   const f = (typeof SRCFW !== 'undefined') && SRCFW[id];
   if(!f) return `<p class="sfnone">This case has no casebook framework added here yet. The pilot covers Army Hotel and Breast Cancer Surgery.</p>`;
-  mode = mode === 'improved' ? 'improved' : 'printed';
+  mode = mode === 'printed' ? 'printed' : 'improved';
   const root = sfRoot(f, mode), stepNo = (inline || si + 1 === f.buildStep) ? 0 : si + 1;
   const lit = [];
   sfWalk(root, 'h', (n,k)=>{ if(stepNo && (n.u||[]).includes(stepNo) && k !== 'h') lit.push(n.t); });
@@ -155,6 +155,7 @@ function srcFwHTML(id, inline, mode){
   </div>`;
   return html.replace(`data-k="${first}"`, `data-k="${first}" aria-pressed="true"`);
 }
+const sfF = t => esc(t).replace(/\{([^|{}]+)\|([^{}]+)\}/g, '<span class="frac"><span>$1</span><span>$2</span></span>');
 function sfDetailHTML(n, key){
   const used = (n.u||[]).length ? 'Used on step ' + n.u.join(', ') : (n.from === 'none' ? 'Not used in this case' : '');
   const kids = (n.k||[]).length;
@@ -162,6 +163,11 @@ function sfDetailHTML(n, key){
     ${n.from?`<span class="sfpill sf-${n.from}">${esc(SF_FROM[n.from])}</span>`:''}${used?`<span class="sfused">${esc(used)}</span>`:''}
     ${n.def?`<div><span class="lab">What it means</span><p>${esc(n.def)}</p></div>`:''}
     ${n.why?`<div><span class="lab">Why you need it</span><p>${esc(n.why)}</p></div>`:''}
+    ${n.fn?`<div class="sffn"><span class="lab">How ${kids?'the parts combine':'it is worked out'}: ${n.fn.k==='calc'?'a calculation':'a test, not arithmetic'}</span>
+      <p>${esc(n.fn.say)}</p><div class="cformula cmath sffml">${sfF(n.fn.f)}</div>
+      <p class="sfunits"><b>Units:</b> ${esc(n.fn.units)}</p>
+      ${(n.fn.ex||[]).length?`<ul class="sfex">${n.fn.ex.map(x=>`<li>${sfF(x)}</li>`).join('')}</ul>`:''}
+      ${n.fn.flag?`<p class="sfflag">${esc(n.fn.flag)}</p>`:''}</div>`:''}
     ${kids&&n.split?`<div class="sfsplit"><span class="lab">Why it branches into ${esc(n.k.map(x=>x.t.replace(/:.*$/,'')).join(', '))}</span><p>${esc(n.split)}</p></div>`:''}
     ${n.n?`<div><span class="lab">In this case</span><p>${esc(n.n)}</p></div>`:''}
     ${n.chg?`<div class="sfchgwhy"><span class="lab">${esc(SF_CHG[n.chg])}: why</span><p>${esc(n.chgwhy||'')}</p></div>`:''}`;
@@ -178,7 +184,7 @@ document.addEventListener('click', e=>{
     const box = tb.closest('.srcfw'); if(!box || tb.dataset.mode === box.dataset.mode) return;
     const tmp = document.createElement('div');
     tmp.innerHTML = srcFwHTML(box.dataset.case, box.classList.contains('inl'), tb.dataset.mode);
-    const nb = tmp.firstElementChild; box.replaceWith(nb);
+    const nb = tmp.firstElementChild; if(box.dataset.only) nb.dataset.only = box.dataset.only; sfMode = tb.dataset.mode; box.replaceWith(nb);
     try{ markTerms(nb.querySelector('.sfdet')); }catch(err){}
     sfFit(nb); return;
   }
@@ -313,6 +319,39 @@ document.addEventListener('click', e=>{
   const c = CASES[ci], k = indKnown(c.id), i = b.closest('.inditem').getAttribute('data-i');
   if(k[i]) delete k[i]; else k[i] = 1; indSave(c.id, k); indOpen.add(i); drawInd(c);
 });
+
+/* ---- Framework bar: the casebook's framework as a bar under the toolkit, same behaviour as the toolkit ---- */
+let sfMode = 'improved', fwbOpen = null;
+function drawFwBar(){
+  const box = document.getElementById('fwbar'); if(!box) return;
+  const c = CASES[ci], f = (typeof SRCFW !== 'undefined') && SRCFW[c.id];
+  if(!f){ box.hidden = true; try{ tkFill(); }catch(e){} return; }
+  box.hidden = false;
+  const root = sfRoot(f, sfMode), step = si + 1;
+  const litIn = n => { let r = false; sfWalk(n, 'h', x=>{ if((x.u||[]).includes(step)) r = true; }); return r; };
+  const chips = [['all', 'Whole tree', litIn(root)]].concat((root.k||[]).map((n,i)=>[String(i), n.t, litIn(n)]));
+  box.innerHTML = `<span class="lab">Framework<span class="cue">${esc(f.src)} · click a branch</span></span>` +
+    chips.map(([k,t,l])=>`<button type="button" class="chip ${l?'new':'have'}" data-b="${k}" aria-pressed="${String(fwbOpen===k)}">${esc(t)}</button>`).join('') +
+    '<span class="fwbkey">dark = used on this step</span>';
+  if(fwbOpen !== null){
+    const pan = document.createElement('div'); pan.className = 'cpanel fwbpanel';
+    pan.innerHTML = srcFwHTML(c.id, false, sfMode);
+    const sf = pan.querySelector('.srcfw'); if(sf && fwbOpen !== 'all') sf.dataset.only = fwbOpen;
+    box.appendChild(pan);
+    try{ markTerms(pan); }catch(e){}
+    if(sf) sfFit(sf);
+  }
+  try{ tkFill(); }catch(e){}
+}
+document.addEventListener('click', e=>{
+  const ch = e.target.closest && e.target.closest('#fwbar > .chip');
+  const op = e.target.closest && e.target.closest('.openfwb');
+  if(!ch && !op) return;
+  const k = ch ? ch.dataset.b : 'all';
+  fwbOpen = (ch && fwbOpen === k) ? null : k;
+  sfPopHide(); drawFwBar();
+  if(op){ const b = document.getElementById('fwbar'); b.scrollIntoView({behavior:'smooth', block:'start'}); }
+});
 function renderV2(c, s, v){
   const bk = c.book === 'kellogg';
   const part = (label, inner) => inner ? `<div class="sub">${label}</div>${inner}` : "";
@@ -370,7 +409,7 @@ function renderV2(c, s, v){
       const srcb = `<div class="src ${bk?'k':''}"><span class="tag s ${bk?'k':''}">Source · ${
           bk?'Kellogg 2020':'Booth 2025'}, ${esc(c.pages)}</span>
           ${v.src.map(([l,t])=>(t==='SRCFW' && typeof SRCFW!=='undefined' && SRCFW[c.id])
-            ? `<div class="srcrow"><span class="l">${esc(l)}</span>${srcFwHTML(c.id,true)}<button type="button" class="openfw" data-open="peekSrc">Keep this open in a side window</button></div>`
+            ? `<div class="srcrow"><span class="l">${esc(l)}</span><p class="sfptr">The casebook's framework now sits in the Framework bar, just under the toolkit. Branches used on this step are lit there.</p><button type="button" class="openfwb" data-b="all">Open the framework bar</button></div>`
             : `<div class="srcrow"><span class="l">${esc(l)}</span>
             <p>${esc(t==='SRCFW'?'':t)}</p></div>`).join('')}</div>`;
       return sf ? srcb + att : att + srcb;
@@ -429,16 +468,21 @@ function drawToolkit(){
    back to the real toolkit and opens that concept there. Collapsed/expanded choice is remembered per reader. */
 function tkFill(){
   const bar = document.getElementById('tkFollow'); if(!bar) return;
-  const tk = document.getElementById('toolkit'); if(!tk) return;
+  const tk = document.getElementById('toolkit'), fb = document.getElementById('fwbar'); if(!tk) return;
   const chips = [...tk.querySelectorAll(':scope > .chip.have, :scope > .chip.new')].filter(c=>c.dataset.c);
-  bar.innerHTML = `<button type="button" class="tkf-lab" aria-expanded="${bar.classList.contains('min')?'false':'true'}" title="Collapse or expand the toolkit bar">Toolkit</button><span class="tkf-chips">` +
-    chips.map(c=>`<button type="button" class="chip ${c.classList.contains('new')?'new':'have'}" data-c="${esc(c.dataset.c)}" aria-pressed="${String(c.dataset.c===conceptOpen)}">${esc(c.dataset.c)}</button>`).join('') + '</span>';
+  const fch = fb && !fb.hidden ? [...fb.querySelectorAll(':scope > .chip')] : [];
+  bar.innerHTML = `<button type="button" class="tkf-lab" aria-expanded="${bar.classList.contains('min')?'false':'true'}" title="Collapse or expand the bars">Toolkit</button><span class="tkf-chips" data-g="tk">` +
+    chips.map(c=>`<button type="button" class="chip ${c.classList.contains('new')?'new':'have'}" data-c="${esc(c.dataset.c)}" aria-pressed="${String(c.dataset.c===conceptOpen)}">${esc(c.dataset.c)}</button>`).join('') + '</span>' +
+    (fch.length ? `<span class="tkf-sep"></span><span class="tkf-lab2">Framework</span><span class="tkf-chips" data-g="fw">` +
+      fch.map(c=>`<button type="button" class="chip ${c.classList.contains('new')?'new':'have'}" data-b="${esc(c.dataset.b)}" aria-pressed="${String(c.dataset.b===fwbOpen)}">${esc(c.textContent)}</button>`).join('') + '</span>' : '');
 }
 function tkPlace(){
-  const bar = document.getElementById('tkFollow'), tk = document.getElementById('toolkit'); if(!bar || !tk) return;
+  const bar = document.getElementById('tkFollow'), tk = document.getElementById('toolkit'), fb = document.getElementById('fwbar'); if(!bar || !tk) return;
   const vv = window.visualViewport, L = vv ? vv.offsetLeft : 0, T = vv ? vv.offsetTop : 0, W = vv ? vv.width : innerWidth, H = vv ? vv.height : innerHeight;
-  const r = tk.getBoundingClientRect(), inView = r.bottom > 0 && r.top < H;
-  bar.hidden = inView || !bar.querySelector('.chip');
+  const vis = e => { if(!e || e.hidden) return true; const r = e.getBoundingClientRect(); return r.bottom > 0 && r.top < H; };
+  const tkIn = vis(tk), fbIn = vis(fb);
+  bar.hidden = (tkIn && fbIn) || !bar.querySelector('.chip');
+  bar.classList.toggle('only-fw', tkIn && !fbIn); bar.classList.toggle('only-tk', !tkIn && fbIn);
   bar.style.left = Math.round(L + 52) + 'px'; bar.style.top = Math.round(T + 10) + 'px'; bar.style.maxWidth = Math.max(160, Math.round(W - 52 - 14)) + 'px';
 }
 (function(){
@@ -447,7 +491,9 @@ function tkPlace(){
   document.body.appendChild(bar);
   bar.addEventListener('click', e=>{
     if(e.target.closest('.tkf-lab')){ bar.classList.toggle('min'); try{ localStorage.setItem('blockTkMin', bar.classList.contains('min')?'1':'0'); }catch(x){} tkFill(); return; }
-    const ch = e.target.closest('.chip'); if(!ch || !ch.dataset.c) return;
+    const ch = e.target.closest('.chip'); if(!ch) return;
+    if(ch.dataset.b !== undefined){ fwbOpen = ch.dataset.b; sfPopHide(); drawFwBar(); document.getElementById('fwbar').scrollIntoView({behavior:'smooth', block:'start'}); return; }
+    if(!ch.dataset.c) return;
     conceptOpen = ch.dataset.c; drawConcept(); markTerms(document.getElementById('toolkit'));
     document.getElementById('toolkit').scrollIntoView({behavior:'smooth', block:'start'});
   });
@@ -507,7 +553,7 @@ function render(){
   try{ sfPopHide(); }catch(e){}
   const c = CASES[ci], s = c.steps[si];
   const v2 = V2[c.id] && V2[c.id][si];
-  drawSparks(); drawToolkit(); drawConcept(); drawRail(); drawBridge(); drawTree(c, si);
+  drawSparks(); drawToolkit(); drawFwBar(); drawConcept(); drawRail(); drawBridge(); drawTree(c, si);
   drawFrameworks(c); drawFacts(c, si); drawSrcFw(c); drawInd(c);
   fitColumn();
   const fig = s.fig && FIGS[s.fig];

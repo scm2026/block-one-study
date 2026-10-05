@@ -1006,3 +1006,29 @@ html.fwdock #fwcard .fwwhen b, html.fwdock #fwcard .fwverdict b{font:600 9px "IB
 .indfl button, .indall{font:inherit; font-size:11px; border:1px solid var(--line-2); background:transparent; color:var(--ink-2); border-radius:12px; padding:2px 10px; cursor:pointer}
 .indfl button[aria-pressed="true"]{border-color:var(--accent-line); color:var(--accent); background:color-mix(in srgb, var(--accent) 8%, transparent)}
 .inditem.known .indbt{opacity:.65}
+
+/* ---- Framework bar + follow-me ---- */
+.fwbar{margin-top:8px}
+.fwbar[hidden]{display:none}
+.fwbar .fwbkey{margin-left:auto; font:italic 11px "IBM Plex Mono",monospace; color:var(--ink-3)}
+.fwbpanel{display:block}
+.fwbpanel .srcfw{margin:0}
+.srcfw[data-only] .sftree > li > ul > li{display:none}
+.srcfw[data-only="0"] .sftree > li > ul > li:nth-child(1), .srcfw[data-only="1"] .sftree > li > ul > li:nth-child(2), .srcfw[data-only="2"] .sftree > li > ul > li:nth-child(3), .srcfw[data-only="3"] .sftree > li > ul > li:nth-child(4), .srcfw[data-only="4"] .sftree > li > ul > li:nth-child(5){display:list-item}
+.sfptr{font-size:13px; color:var(--ink-2); margin:2px 0 6px}
+.openfwb{font:inherit; font-size:12px; border:1px solid var(--accent-line); background:var(--accent-soft); color:var(--ink); border-radius:3px; padding:3px 10px; cursor:pointer}
+#tkFollow .tkf-sep{width:1px; align-self:stretch; background:var(--line-2); margin:0 4px; flex:none}
+#tkFollow .tkf-lab2{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); flex:none}
+#tkFollow.only-fw [data-g="tk"], #tkFollow.only-fw .tkf-sep, #tkFollow.only-fw > .tkf-lab{display:none}
+#tkFollow.only-tk [data-g="fw"], #tkFollow.only-tk .tkf-sep, #tkFollow.only-tk .tkf-lab2{display:none}
+#tkFollow.min .tkf-lab2, #tkFollow.min .tkf-sep{display:none}
+.sffn{margin:7px 0; padding:7px 9px; border-radius:6px; background:color-mix(in srgb, var(--accent) 7%, transparent); border-left:3px solid var(--accent-line)}
+.sffn p{margin:0 0 5px}
+.sffn .cformula{margin:3px 0 5px}
+.sffn .sfunits{font-size:12px; color:var(--ink-2)}
+.sffn .sfex{margin:3px 0 0; padding-left:17px; font-size:12px; line-height:1.5}
+.sffn .sfex li{margin:0 0 2px}
+.sffn .sfflag{font-style:italic; font-size:11px; color:var(--ink-3); margin:4px 0 0}
+.fwtip.sfpop .sffn .cformula{font-size:13px}
+
+.sffn .sfex .frac{font-size:.92em}
