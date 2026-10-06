@@ -320,6 +320,60 @@ document.addEventListener('click', e=>{
   if(k[i]) delete k[i]; else k[i] = 1; indSave(c.id, k); indOpen.add(i); drawInd(c);
 });
 
+
+/* ---- Math drills: the arithmetic a case uses, easiest first; same accordion as Industry lens ---- */
+function mathKnown(id){ try{ return JSON.parse(localStorage.getItem('blockMath:'+id)||'{}'); }catch(e){ return {}; } }
+function mathSave(id,o){ try{ localStorage.setItem('blockMath:'+id, JSON.stringify(o)); }catch(e){} }
+const mathOpen = new Set();
+let mathFilter = 'all';
+const MLVL = {1:'Foundation', 2:'Core', 3:'Stretch'};
+function drawMath(c){
+  const w = document.querySelector('#peekMath .pbody'); if(!w) return;
+  const D = typeof MATHDRILLS !== 'undefined' && MATHDRILLS[c.id];
+  const pc = document.querySelector('#peekMath .pc');
+  if(!D){ w.innerHTML = '<p class="indnone">No math drills for this case yet.</p>'; if(pc) pc.textContent = 'none'; return; }
+  const known = mathKnown(c.id), step = si + 1;
+  let nk = 0; D.items.forEach((it,i)=>{ if(known[i]) nk++; });
+  const defs = it => it.defs && it.defs.length ? `<dl class="inddefs"><dt class="ilab">Words in this note</dt>${it.defs.map(([t,m])=>`<dd><b>${esc(t)}</b>: ${esc(m)}</dd>`).join('')}</dl>` : '';
+  const items = D.items.map((it,i)=>[it,i]).filter(([it])=>mathFilter === 'all' || String(it.lvl) === mathFilter);
+  const card = ([it,i]) => {
+    const key = String(i), open = mathOpen.has(key), lit = it.u && it.u.indexOf(step) >= 0;
+    return `<div class="inditem mathitem${open?' open':''}${known[i]?' known':''}${lit?' lit':''}" data-i="${key}">
+      <button type="button" class="indbtn" aria-expanded="${open}">
+        <span class="indtop"><i class="indtag t-m${it.lvl}">${i+1} · ${MLVL[it.lvl]}</i>${lit?'<i class="indtag t-this">this step</i>':''}${known[i]?'<i class="indck">known ✓</i>':''}<span class="indchev" aria-hidden="true"></span></span>
+        <span class="indbt">${esc(it.h)}</span>
+        <span class="indsum">${esc(it.sum)}</span>
+      </button>
+      <div class="indbody">
+        <p><span class="ilab">The idea</span>${esc(it.idea)}</p>
+        <span class="ilab">Worked with the case's numbers</span>
+        <ol class="wsteps">${it.ex.map(st=>`<li><p>${esc(st.say)}</p>${st.f?`<div class="cformula cmath">${sfF(st.f)}</div>`:''}</li>`).join('')}</ol>
+        <p><span class="ilab">Units</span>${esc(it.units)}</p>
+        <p class="indask"><span class="ilab">Common slip</span>${esc(it.mistake)}</p>
+        ${defs(it)}
+        <div class="indfoot"><span class="indsrc">${it.u?'Used in step'+(it.u.length>1?'s ':' ')+it.u.join(', '):''}</span><button type="button" class="mtick" aria-pressed="${known[i]?'true':'false'}">${known[i]?'I can do this ✓':'I can do this'}</button></div>
+      </div></div>`;
+  };
+  if(pc) pc.textContent = nk + '/' + D.items.length + ' done';
+  w.innerHTML = `<p class="indsub">${esc(D.sub)}</p>
+    <div class="indbar"><span class="indfl" role="group" aria-label="Show">${[['all','All'],['1','Foundation'],['2','Core'],['3','Stretch']].map(([k,l])=>`<button type="button" data-f="${k}" aria-pressed="${mathFilter===k}">${l}</button>`).join('')}</span><button type="button" class="indall">Expand all</button></div>`
+    + items.map(card).join('');
+  try{ markTerms(w); w.querySelectorAll('.cformula .term').forEach(t=>t.replaceWith(document.createTextNode(t.textContent))); }catch(err){}
+}
+document.addEventListener('click', e=>{
+  const f = e.target.closest && e.target.closest('#peekMath .indfl button');
+  if(f){ mathFilter = f.dataset.f; drawMath(CASES[ci]); return; }
+  const all = e.target.closest && e.target.closest('#peekMath .indall');
+  if(all){ const its = [...document.querySelectorAll('#peekMath .inditem')]; const anyClosed = its.some(x=>!x.classList.contains('open'));
+    its.forEach(x=>{ if(anyClosed) mathOpen.add(x.dataset.i); else mathOpen.delete(x.dataset.i); }); drawMath(CASES[ci]); return; }
+  const tk = e.target.closest && e.target.closest('#peekMath .mtick');
+  if(tk){ const c = CASES[ci], k = mathKnown(c.id), i = tk.closest('.inditem').dataset.i; if(k[i]) delete k[i]; else k[i] = 1; mathSave(c.id, k); mathOpen.add(i); drawMath(c); return; }
+  const bt = e.target.closest && e.target.closest('#peekMath .indbtn');
+  if(bt){ const it = bt.closest('.inditem'), k = it.dataset.i; const op = !it.classList.contains('open');
+    it.classList.toggle('open', op); bt.setAttribute('aria-expanded', String(op)); if(op) mathOpen.add(k); else mathOpen.delete(k);
+    const a = document.querySelector('#peekMath .indall'); if(a) a.textContent = [...document.querySelectorAll('#peekMath .inditem')].some(x=>!x.classList.contains('open')) ? 'Expand all' : 'Collapse all'; }
+});
+
 /* ---- Framework bar: the casebook's framework as a bar under the toolkit, same behaviour as the toolkit ---- */
 let sfMode = 'improved', fwbOpen = null;
 function drawFwBar(){
@@ -554,7 +608,7 @@ function render(){
   const c = CASES[ci], s = c.steps[si];
   const v2 = V2[c.id] && V2[c.id][si];
   drawSparks(); drawToolkit(); drawFwBar(); drawConcept(); drawRail(); drawBridge(); drawTree(c, si);
-  drawFrameworks(c); drawFacts(c, si); drawSrcFw(c); drawInd(c);
+  drawFrameworks(c); drawFacts(c, si); drawSrcFw(c); drawInd(c); drawMath(c);
   fitColumn();
   const fig = s.fig && FIGS[s.fig];
   el('fig').innerHTML = fig ? FIGS[s.fig]() : "";
@@ -783,7 +837,7 @@ function buildShade(){
 
 buildTint();
 buildRevealMode();
-buildDock(); drawSrcFw(CASES[ci]); drawInd(CASES[ci]);
+buildDock(); drawSrcFw(CASES[ci]); drawInd(CASES[ci]); drawMath(CASES[ci]);
 buildShade();
 buildRailToggle();
 buildSplitLine();
@@ -1079,8 +1133,8 @@ function buildDock(){
     w.innerHTML = '<header><span class="pt">' + title + '</span><span class="pc"></span><button type="button" class="pclose" aria-label="Close ' + title + ' and return it to the side" title="Close: send it back to the side">✕</button></header><div class="pbody"></div>';
     nodes.filter(Boolean).forEach(n=>w.querySelector('.pbody').appendChild(n)); return w;
   };
-  const pt = mk('peekTree', 'Framework tree', [tree, cap]), pn = mk('peekNotes', 'Notes so far', [fact]), ps = mk('peekSrc', 'Casebook framework', []), pi = mk('peekInd', 'Industry lens', []);
-  dock.append(pt, ps, pi, pn); document.body.appendChild(dock);
+  const pt = mk('peekTree', 'Framework tree', [tree, cap]), pn = mk('peekNotes', 'Notes so far', [fact]), ps = mk('peekSrc', 'Casebook framework', []), pi = mk('peekInd', 'Industry lens', []), pm = mk('peekMath', 'Math drills', []);
+  dock.append(pt, ps, pi, pm, pn); document.body.appendChild(dock);
   if(window.FWDOCK){
     const pb = pt.querySelector('.pbody'), fc = document.getElementById('fwcard');
     if(fc){

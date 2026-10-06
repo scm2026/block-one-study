@@ -1032,3 +1032,17 @@ html.fwdock #fwcard .fwwhen b, html.fwdock #fwcard .fwverdict b{font:600 9px "IB
 .fwtip.sfpop .sffn .cformula{font-size:13px}
 
 .sffn .sfex .frac{font-size:.92em}
+
+/* Math drills: same accordion as Industry lens */
+.peek#peekMath.open{width:clamp(460px,44vw,680px)}
+.indtag.t-m1{color:#1f6b3a; border-color:#a5cfb0}
+.indtag.t-m2{color:#1f5f8b; border-color:#9fc4de}
+.indtag.t-m3{color:#8a3a00; border-color:#e0b090}
+.indtag.t-this{color:var(--accent); border-color:var(--accent-line)}
+.mathitem .wsteps{margin:4px 0 8px; padding-left:22px}
+.mathitem .wsteps li{margin:0 0 9px}
+.mathitem .wsteps li p{margin:0 0 4px; font-size:12.5px; line-height:1.55}
+.mathitem .wsteps .cformula{margin:2px 0 0; font-size:14px}
+.mathitem .indbody p{font-size:12.5px}
+.mtick{font:inherit; font-size:10.5px; border:1px solid var(--line); background:transparent; color:var(--ink-2); border-radius:12px; padding:2px 9px; cursor:pointer}
+.mtick[aria-pressed="true"]{border-color:var(--accent-line); color:var(--accent)}
