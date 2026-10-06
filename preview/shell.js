@@ -348,6 +348,8 @@ function drawMath(c){
         <p><span class="ilab">The idea</span>${esc(it.idea)}</p>
         <span class="ilab">Worked with the case's numbers</span>
         <ol class="wsteps">${it.ex.map(st=>`<li><p>${esc(st.say)}</p>${st.f?`<div class="cformula cmath">${sfF(st.f)}</div>`:''}</li>`).join('')}</ol>
+        ${it.mental?`<span class="ilab">In your head, as you would say it in an interview</span>
+        <ol class="wsteps mental">${it.mental.map(st=>`<li><p>${esc(st.say)}</p>${st.f?`<div class="cformula cmath">${esc(st.f)}</div>`:''}</li>`).join('')}</ol>`:''}
         <p><span class="ilab">Units</span>${esc(it.units)}</p>
         <p class="indask"><span class="ilab">Common slip</span>${esc(it.mistake)}</p>
         ${defs(it)}
