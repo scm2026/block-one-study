@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Casebook: Block One and Block Two</title>
+<style>
+  html,body{margin:0;height:100%;background:#fbf9f4;color:#1d1d1b;font-family:"Public Sans",system-ui,sans-serif}
+  .bar{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #d8d2c4;background:#fff}
+  .bar label{font-size:13px;font-weight:600}
+  select{font:inherit;font-size:15px;padding:6px 10px;border:1px solid #bfb8a6;border-radius:6px;background:#fff;min-width:260px}
+  iframe{border:0;width:100%;height:calc(100% - 52px);display:block}
+  @media (max-width:600px){ .bar{padding:8px 12px} select{min-width:0;flex:1;font-size:16px} }
+</style>
+</head>
+<body>
+<div class="bar">
+  <label for="case">Case</label>
+  <select id="case">
+    <optgroup label="Block One">
+      <option value="one|BTH-01">Army Hotel</option>
+      <option value="one|BTH-19">Heavy Attrition</option>
+      <option value="one|BTH-11">Electric Utility</option>
+      <option value="one|BTH-02">Breast Cancer Surgery</option>
+      <option value="one|BTH-05">Cleaning Products</option>
+    </optgroup>
+    <optgroup label="Block Two">
+      <option value="two|BTH-38">White Boards</option>
+      <option value="two|BTH-23">Lola Lo's Zoo</option>
+      <option value="two|KEL-24">Wine &amp; Co</option>
+      <option value="two|BTH-03">Burger Palace</option>
+      <option value="two|KEL-02">Chic Cosmetology</option>
+    </optgroup>
+  </select>
+</div>
+<iframe id="pane" title="Case" src="one/index.html?c=BTH-01#case=BTH-01"></iframe>
+<script>
+  const sel = document.getElementById('case'), pane = document.getElementById('pane');
+  function load(v){
+    const [blk, id] = v.split('|');
+    pane.src = blk + '/index.html?c=' + id + '#case=' + id;
+  }
+  sel.addEventListener('change', () => load(sel.value));
+  try {
+    const m = location.hash.match(/case=([^&]+)/);
+    if (m) { const o = [...sel.options].find(o => o.value.endsWith('|' + decodeURIComponent(m[1]))); if (o) { sel.value = o.value; load(o.value); } }
+  } catch (e) {}
+</script>
+</body>
+</html>
