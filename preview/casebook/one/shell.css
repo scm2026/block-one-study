@@ -942,7 +942,7 @@ html.fwdock #fwcard .fwwhen b, html.fwdock #fwcard .fwverdict b{font:600 9px "IB
 .indtick[aria-pressed="true"]{border-color:var(--accent-line); color:var(--accent)}
 .fwtip .here.ind .indsrc{margin:2px 0 0; font-size:10.5px; color:var(--ink-3)}
 /* ---- follow-me toolkit bar ---- */
-#tkFollow{position:fixed; z-index:30; display:flex; align-items:center; gap:6px; padding:5px 8px; border:1px solid var(--line); border-radius:12px;
+#tkFollow{position:fixed; z-index:30; display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:5px 8px; border:1px solid var(--line); border-radius:12px;
   background:color-mix(in srgb, var(--panel) 92%, transparent); backdrop-filter:blur(6px); box-shadow:0 2px 10px rgba(0,0,0,.12)}
 #tkFollow[hidden]{display:none}
 #tkFollow .tkf-lab{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); background:none; border:0; cursor:pointer; padding:2px 4px; flex:none}
@@ -1017,7 +1017,9 @@ html.fwdock #fwcard .fwwhen b, html.fwdock #fwcard .fwverdict b{font:600 9px "IB
 .srcfw[data-only="0"] .sftree > li > ul > li:nth-child(1), .srcfw[data-only="1"] .sftree > li > ul > li:nth-child(2), .srcfw[data-only="2"] .sftree > li > ul > li:nth-child(3), .srcfw[data-only="3"] .sftree > li > ul > li:nth-child(4), .srcfw[data-only="4"] .sftree > li > ul > li:nth-child(5){display:list-item}
 .sfptr{font-size:13px; color:var(--ink-2); margin:2px 0 6px}
 .openfwb{font:inherit; font-size:12px; border:1px solid var(--accent-line); background:var(--accent-soft); color:var(--ink); border-radius:3px; padding:3px 10px; cursor:pointer}
-#tkFollow .tkf-sep{width:1px; align-self:stretch; background:var(--line-2); margin:0 4px; flex:none}
+#tkFollow .tkf-sep{flex:0 0 100%; width:100%; height:0; margin:0; padding:0; background:none}
+#tkFollow .tkf-lab2{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); padding:0 4px; flex:none}
+#tkFollow .tkf-lab2 + .tkf-chips{margin-left:0}
 #tkFollow .tkf-lab2{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); flex:none}
 #tkFollow.only-fw [data-g="tk"], #tkFollow.only-fw .tkf-sep, #tkFollow.only-fw > .tkf-lab{display:none}
 #tkFollow.only-tk [data-g="fw"], #tkFollow.only-tk .tkf-sep, #tkFollow.only-tk .tkf-lab2{display:none}
